@@ -8,6 +8,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader'
 import { Button } from '@/components/ui/Button'
 import { useTranslation } from '@/hooks/useTranslation'
 import { ROUTES } from '@/lib/constants'
+import { createRoomId } from '@/lib/meetingIdentity'
 import { useMeetingStore } from '@/store/meetingStore'
 
 export default function LandingPage() {
@@ -15,15 +16,18 @@ export default function LandingPage() {
   const { t } = useTranslation()
 
   const handleStartMeeting = () => {
-    navigate(ROUTES.setup)
+    navigate(ROUTES.create)
   }
 
   const handleViewDemo = () => {
-    const { resetMeeting, startMeeting } = useMeetingStore.getState()
+    const roomId = createRoomId()
+    const { resetMeeting, setMeetingId, startMeeting } =
+      useMeetingStore.getState()
 
     resetMeeting()
+    setMeetingId(roomId)
     startMeeting()
-    navigate(ROUTES.meeting)
+    navigate(ROUTES.meeting(roomId))
   }
 
   return (

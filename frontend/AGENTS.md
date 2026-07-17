@@ -7,12 +7,16 @@
    explicitly changes it.
 2. Treat this file as the implementation policy and [`README.md`](./README.md)
    as a description of the repository's current state.
-3. The repository currently implements a vertical slice, not the complete
+3. For realtime work, use [`../Architecture.md`](../Architecture.md) as the
+   intended integration guide and verify its claims against
+   `../realtime-service/src`, which defines the current wire behavior. Resolve
+   discrepancies before enabling a production connection.
+4. The repository currently implements a vertical slice, not the complete
    locked MVP. Do not describe an unimplemented requirement as complete.
-4. Complete P0 requirements before P1 or P2 work. Future architecture,
+5. Complete P0 requirements before P1 or P2 work. Future architecture,
    recommended integrations, and bonus features are not authorization to add
    them.
-5. Keep the documented non-goals out of the MVP unless the user explicitly
+6. Keep the documented non-goals out of the MVP unless the user explicitly
    expands the scope.
 
 ## Product invariants
@@ -25,24 +29,27 @@
    microphone or require speaker diarization.
 3. Preserve room, participant, language, sequence, timing, and draft/final
    metadata at realtime event boundaries.
-4. Keep deterministic mock mode available until a real pipeline is explicitly
+4. Keep the URL room ID, Socket.IO `sessionId`, and LiveKit `roomName`
+   identical. Persist one `clientId` per browser and use it as the LiveKit
+   participant identity when realtime integration is enabled.
+5. Keep deterministic mock mode available until a real pipeline is explicitly
    requested and reliable. Clearly label simulated media, latency, connection,
    and translation behavior.
-5. Never claim local processing, on-premise deployment, encryption, privacy, or
+6. Never claim local processing, on-premise deployment, encryption, privacy, or
    AI accuracy that is not implemented and verified.
-6. Follow the target room-scoped route contract in `REQUIREMENTS.md` when
+7. Follow the target room-scoped route contract in `REQUIREMENTS.md` when
    extending the journey. Existing `/setup`, `/meeting`, and `/summary` routes
-   are transitional prototype routes, not the target information architecture.
-7. Use the documented light application shell and reserve the charcoal theme
+   are compatibility redirects, not the canonical information architecture.
+8. Use the documented light application shell and reserve the charcoal theme
    for the live video stage. Reuse the design tokens in
    `src/styles/globals.css`.
-8. All prominent actions must work. If a non-goal is represented in the UI,
+9. All prominent actions must work. If a non-goal is represented in the UI,
    make its unavailable state explicit rather than presenting a dead control.
-9. All interface copy must support English and Vietnamese through the typed
+10. All interface copy must support English and Vietnamese through the typed
    translation system in `src/i18n`; do not hardcode new visible UI strings in
    components. User-entered content and bilingual meeting records remain domain
    data.
-10. Preserve semantic HTML, keyboard access, visible focus, non-color status
+11. Preserve semantic HTML, keyboard access, visible focus, non-color status
     cues, reduced-motion support, and responsive behavior.
 
 ## Engineering rules

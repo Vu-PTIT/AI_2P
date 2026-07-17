@@ -11,6 +11,7 @@ import { Dialog } from '@/components/ui/Dialog'
 import { useDemoSimulation } from '@/hooks/useDemoSimulation'
 import { useMeetingClock } from '@/hooks/useMeetingClock'
 import { usePushToTalk } from '@/hooks/usePushToTalk'
+import { useRoomSession } from '@/hooks/useRoomSession'
 import { useTranslation } from '@/hooks/useTranslation'
 import { ROUTES } from '@/lib/constants'
 import { useMeetingStore } from '@/store/meetingStore'
@@ -18,6 +19,7 @@ import { useMeetingStore } from '@/store/meetingStore'
 export default function LiveMeetingPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const roomId = useRoomSession()
   const [contextOpen, setContextOpen] = useState(false)
   const [noteDialogOpen, setNoteDialogOpen] = useState(false)
   const [noteText, setNoteText] = useState('')
@@ -54,7 +56,7 @@ export default function LiveMeetingPage() {
 
   const handleEndMeeting = () => {
     endMeeting(new Date().toISOString(), elapsedSeconds)
-    navigate(ROUTES.summary)
+    navigate(ROUTES.summary(roomId))
   }
 
   const handleNoteSubmit = (event: FormEvent) => {

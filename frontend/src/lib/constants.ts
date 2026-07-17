@@ -1,8 +1,11 @@
 export const ROUTES = {
   landing: '/',
-  setup: '/setup',
-  meeting: '/meeting',
-  summary: '/summary',
+  create: '/create',
+  setup: (roomId: string) =>
+    `/room/${encodeURIComponent(roomId)}/setup`,
+  meeting: (roomId: string) => `/room/${encodeURIComponent(roomId)}`,
+  summary: (roomId: string) =>
+    `/room/${encodeURIComponent(roomId)}/summary`,
 } as const
 
 export const LANGUAGE_SHORT_LABELS = {

@@ -130,7 +130,9 @@ export function ConversationTurnCard({
                   )}
                 >
                   {turn.originalText ||
-                    (turn.status === 'listening'
+                    (turn.status === 'failed'
+                      ? t('turn.processingFailed')
+                      : turn.status === 'listening'
                       ? t('turn.waiting')
                       : t('turn.transcribing'))}
                 </p>
@@ -187,10 +189,12 @@ export function ConversationTurnCard({
                   )}
                 >
                   {turn.translatedText ||
-                    (turn.status === 'listening' ||
-                    turn.status === 'transcribing'
-                      ? t('turn.translationPending')
-                      : t('turn.preparingTranslation'))}
+                    (turn.status === 'failed'
+                      ? t('turn.processingFailed')
+                      : turn.status === 'listening' ||
+                          turn.status === 'transcribing'
+                        ? t('turn.translationPending')
+                        : t('turn.preparingTranslation'))}
                 </p>
               </div>
             </div>

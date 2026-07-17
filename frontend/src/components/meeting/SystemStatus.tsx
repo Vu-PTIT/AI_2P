@@ -1,40 +1,72 @@
-import { Cloud, Gauge, Radio, Volume2 } from 'lucide-react'
+import { FlaskConical, Gauge, Hash, Radio, Volume2 } from 'lucide-react'
 
 import { mockSystemStatus } from '@/data/mockMeeting'
 import { useTranslation } from '@/hooks/useTranslation'
 import type { TranslationKey } from '@/i18n/translations'
 import { formatLatency } from '@/lib/formatters'
+import { useMeetingStore } from '@/store/meetingStore'
+import type { RealtimeSessionStatus } from '@/types/realtime'
 
-const statusItems = [
-  {
-    labelKey: 'system.connection',
-    valueKey: 'system.excellent',
-    icon: Radio,
-  },
-  {
-    labelKey: 'system.latency',
-    value: formatLatency(mockSystemStatus.translationLatencyMs),
-    icon: Gauge,
-  },
-  {
-    labelKey: 'system.noise',
-    valueKey: 'common.low',
-    icon: Volume2,
-  },
-  {
-    labelKey: 'system.mode',
-    valueKey: 'system.cloudPrototype',
-    icon: Cloud,
-  },
-] as const satisfies readonly {
-  labelKey: TranslationKey
-  value?: string
-  valueKey?: TranslationKey
-  icon: typeof Radio
-}[]
+const connectionValueKeys = {
+  mock: 'system.offlineDemo',
+  'gateway-connected': 'system.gatewayConnected',
+  ended: 'system.sessionEnded',
+  error: 'system.connectionIssue',
+} as const satisfies Record<RealtimeSessionStatus, TranslationKey>
 
 export function SystemStatus() {
   const { t } = useTranslation()
+  const meetingId = useMeetingStore((state) => state.meeting.id)
+  const realtimeStatus = useMeetingStore(
+    (state) => state.realtimeSession.status,
+  )
+  const statusItems = [
+    {
+      labelKey: 'system.room',
+      value: meetingId,
+      icon: Hash,
+    },
+    {
+      labelKey: 'system.connection',
+      valueKey: connectionValueKeys[realtimeStatus],
+      icon: Radio,
+    },
+    {
+      labelKey:
+        realtimeStatus === 'mock'
+          ? 'system.mockLatency'
+          : 'system.latency',
+      ...(realtimeStatus === 'mock'
+        ? {
+            value: formatLatency(
+              mockSystemStatus.translationLatencyMs,
+            ),
+          }
+        : { valueKey: 'system.awaitingMetrics' }),
+      icon: Gauge,
+    },
+    {
+      labelKey: 'system.noise',
+      valueKey:
+        realtimeStatus === 'mock'
+          ? 'common.low'
+          : 'system.awaitingMetrics',
+      icon: Volume2,
+    },
+    {
+      labelKey: 'system.mode',
+      valueKey:
+        realtimeStatus === 'mock'
+          ? 'system.cloudPrototype'
+          : 'system.realtimeGateway',
+      icon: FlaskConical,
+    },
+  ] as const satisfies readonly {
+    labelKey: TranslationKey
+    value?: string
+    valueKey?: TranslationKey
+    icon: typeof Radio
+  }[]
 
   return (
     <section
@@ -59,7 +91,7 @@ export function SystemStatus() {
                 <Icon className="size-3.5" aria-hidden="true" />
                 {t(item.labelKey)}
               </dt>
-              <dd className="text-right font-semibold text-muted-strong">
+              <dd className="max-w-[10rem] truncate text-right font-semibold text-muted-strong">
                 {'valueKey' in item ? t(item.valueKey) : item.value}
               </dd>
             </div>

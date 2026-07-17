@@ -57,15 +57,16 @@ pnpm preview  # Preview the production build
 
 ## Current prototype routes
 
-These routes are transitional. Follow the room-scoped information architecture
-in `REQUIREMENTS.md` when implementing the remaining P0 journey.
-
 | Route | Screen |
 | --- | --- |
 | `/` | Concise product landing page and conversation preview |
-| `/setup` | Meeting details, mock microphone test, and glossary CRUD |
-| `/meeting` | Live bilingual meeting console and scripted demo |
-| `/summary` | Summary, actions, decisions, transcript, and browser export |
+| `/create` | Create a local room and continue to setup |
+| `/room/:roomId/setup` | Meeting details, mock microphone test, and glossary CRUD |
+| `/room/:roomId` | Live bilingual meeting console and scripted demo |
+| `/room/:roomId/summary` | Summary, actions, decisions, transcript, and browser export |
+
+The old `/setup`, `/meeting`, and `/summary` paths redirect to a generated
+room-scoped URL for compatibility.
 
 ## Implemented interactions
 
@@ -77,7 +78,8 @@ in `REQUIREMENTS.md` when implementing the remaining P0 journey.
 - Add, edit, and remove glossary terms
 - Start and end a meeting
 - Run or safely reset the deterministic four-turn conversation
-- Progress through listening, transcribing, draft, and final states
+- Progress through backend-shaped `stt.partial`, `stt.final`,
+  `translate.token`, and `translate.done` events
 - Toggle the microphone and swap the visible language order
 - Use Space and Enter as simulated push-to-talk controls outside form fields
 - Copy and correct translations
@@ -90,12 +92,21 @@ in `REQUIREMENTS.md` when implementing the remaining P0 journey.
 
 The live experience is clearly labeled as scripted. Audio levels, connection
 quality, latency, noise level, and translation states are mock values. The
-translation mode is shown as **Cloud prototype**; the UI does not claim that
-local or on-premise processing is active.
+translation mode is shown as **Deterministic mock**; the UI does not claim that
+a cloud, local, or on-premise processing pipeline is active.
 
-The store and simulation boundaries are structured so a later WebSocket-based
-AI pipeline can replace the scripted events without changing the page
-architecture.
+The room ID in the URL is the canonical future Socket.IO `sessionId` and
+LiveKit `roomName`. A stable browser `clientId` is persisted locally for the
+future LiveKit participant identity. The deterministic demo passes normalized
+backend events through the same typed store reducer intended for a later
+Socket.IO adapter.
+
+The production connection remains intentionally disabled. Before enabling it,
+the backend must distinguish simultaneous participant audio streams, attach a
+participant identity to transcript events, and only report AI readiness after
+the AI WebSocket is open. Current server events also omit sequence and timing
+metadata, so the frontend derives those values locally until the contract is
+extended.
 
 ## Project structure
 
@@ -111,9 +122,9 @@ src/
 ├── data/                 # Realistic mock meeting data
 ├── hooks/                # Clock, clipboard, PTT, and demo orchestration
 ├── i18n/                 # Typed English and Vietnamese dictionaries
-├── lib/                  # Constants, formatting, transcript, and utilities
+├── lib/                  # Identity, realtime reducers, formatting, and utilities
 ├── pages/                # Four route-level page components
 ├── store/                # Typed Zustand meeting and locale stores
 ├── styles/               # Tailwind theme and global styles
-└── types/                # Shared meeting and i18n domain types
+└── types/                # Meeting, realtime contract, and i18n domain types
 ```

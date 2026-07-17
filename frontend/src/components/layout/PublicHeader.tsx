@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { BrandMark } from '@/components/layout/BrandMark'
 import { LocaleSwitcher } from '@/components/layout/LocaleSwitcher'
 import { useTranslation } from '@/hooks/useTranslation'
+import { ROUTES } from '@/lib/constants'
 
 export function PublicHeader() {
   const { t } = useTranslation()
@@ -29,7 +30,7 @@ export function PublicHeader() {
           </a>
           <LocaleSwitcher className="ml-1" />
           <Link
-            to="/setup"
+            to={ROUTES.create}
             className="inline-flex min-h-10 items-center rounded-[10px] border border-primary bg-primary px-4 text-sm font-semibold text-white transition-colors hover:border-primary-hover hover:bg-primary-hover"
           >
             {t('nav.startMeeting')}

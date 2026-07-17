@@ -20,8 +20,10 @@ import {
   mockConversationTurns,
 } from '@/data/mockMeeting'
 import { useClipboard } from '@/hooks/useClipboard'
+import { useRoomSession } from '@/hooks/useRoomSession'
 import { useTranslation } from '@/hooks/useTranslation'
 import { ROUTES } from '@/lib/constants'
+import { createRoomId } from '@/lib/meetingIdentity'
 import {
   formatDurationLabel,
   formatLanguagePair,
@@ -36,6 +38,7 @@ import type { ActionItem } from '@/types/meeting'
 export default function MeetingSummaryPage() {
   const navigate = useNavigate()
   const { locale, t } = useTranslation()
+  useRoomSession()
   const meeting = useMeetingStore((state) => state.meeting)
   const prepareAnotherMeeting = useMeetingStore(
     (state) => state.prepareAnotherMeeting,
@@ -92,8 +95,10 @@ export default function MeetingSummaryPage() {
   }
 
   const startAnotherMeeting = () => {
+    const roomId = createRoomId()
     prepareAnotherMeeting()
-    navigate(ROUTES.setup)
+    useMeetingStore.getState().setMeetingId(roomId)
+    navigate(ROUTES.setup(roomId))
   }
 
   return (

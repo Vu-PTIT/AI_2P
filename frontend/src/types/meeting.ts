@@ -10,6 +10,7 @@ export type TranslationStatus =
   | 'draft'
   | 'final'
   | 'low-confidence'
+  | 'failed'
 
 export type MeetingStatus = 'setup' | 'live' | 'ended'
 
@@ -41,11 +42,15 @@ export interface MeetingNote {
 
 export interface ConversationTurn {
   id: string
+  roomId: string
+  sequenceNumber: number
   speakerId: string
   speakerName: string
   sourceLanguage: Language
   targetLanguage: Language
   timestampSeconds: number
+  startedAt: number
+  endedAt?: number
   originalText: string
   translatedText: string
   status: TranslationStatus
@@ -93,10 +98,10 @@ export interface MicrophoneOption {
 }
 
 export interface SystemStatus {
-  connection: 'excellent' | 'good' | 'unstable'
+  connection: 'offline-demo' | 'excellent' | 'good' | 'unstable'
   translationLatencyMs: number
   noiseLevel: NoiseLevel
-  translationMode: 'cloud-prototype'
+  translationMode: 'deterministic-mock'
 }
 
 export type GlossaryTermInput = Omit<GlossaryTerm, 'id'>

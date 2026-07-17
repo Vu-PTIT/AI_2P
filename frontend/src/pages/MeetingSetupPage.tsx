@@ -9,6 +9,7 @@ import {
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import { useRoomSession } from '@/hooks/useRoomSession'
 import { useTranslation } from '@/hooks/useTranslation'
 import { ROUTES } from '@/lib/constants'
 import { useMeetingStore } from '@/store/meetingStore'
@@ -16,11 +17,12 @@ import { useMeetingStore } from '@/store/meetingStore'
 export default function MeetingSetupPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const roomId = useRoomSession()
   const startMeeting = useMeetingStore((state) => state.startMeeting)
 
   const handleStartMeeting = () => {
     startMeeting()
-    navigate(ROUTES.meeting)
+    navigate(ROUTES.meeting(roomId))
   }
 
   return (

@@ -1,4 +1,4 @@
-import { AudioLines, Check, Cloud, Languages } from 'lucide-react'
+import { AudioLines, Check, FlaskConical, Languages } from 'lucide-react'
 
 import { useTranslation } from '@/hooks/useTranslation'
 
@@ -156,7 +156,7 @@ export function ConversationPreview() {
           {t('preview.connection')}
         </span>
         <span className="flex items-center gap-2 sm:justify-center">
-          <Cloud aria-hidden="true" className="size-3.5" />
+          <FlaskConical aria-hidden="true" className="size-3.5" />
           {t('preview.cloudPrototype')}
         </span>
         <span className="sm:text-right">{t('preview.latency')}</span>

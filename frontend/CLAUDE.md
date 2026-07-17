@@ -10,6 +10,10 @@ Before changing the project:
 3. Use [`README.md`](./README.md) to understand what the repository currently
    implements; do not confuse current implementation with the complete target
    MVP.
+4. For realtime integration, compare the intended contract in
+   [`../Architecture.md`](../Architecture.md) with the current implementation
+   in `../realtime-service/src`; do not assume the documentation and wire
+   behavior are identical.
 
 Project constraints:
 
@@ -17,6 +21,8 @@ Project constraints:
   documented non-goals unless the user explicitly changes scope.
 - Preserve the two-participant, separate-device, independent-language-channel
   model.
+- Keep the URL room ID, Socket.IO `sessionId`, and LiveKit `roomName`
+  identical, with one stable `clientId` per browser.
 - Keep prototype behavior deterministic and visibly labeled as simulated.
 - Do not add backend or external AI calls during the P0 prototype and never
   expose credentials in frontend code.

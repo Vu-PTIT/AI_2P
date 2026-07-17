@@ -107,13 +107,17 @@ export const demoTurnScripts: readonly DemoTurnScript[] = [
 ]
 
 export const mockConversationTurns: readonly ConversationTurn[] =
-  demoTurnScripts.map((script) => ({
+  demoTurnScripts.map((script, index) => ({
     id: script.id,
+    roomId: 'meeting-demo',
+    sequenceNumber: index + 1,
     speakerId: script.speakerId,
     speakerName: script.speakerName,
     sourceLanguage: script.sourceLanguage,
     targetLanguage: script.targetLanguage,
     timestampSeconds: script.timestampSeconds,
+    startedAt: script.timestampSeconds * 1_000,
+    endedAt: script.timestampSeconds * 1_000 + 2_300,
     originalText: script.originalText,
     translatedText: script.finalTranslation,
     status: 'final',
@@ -135,10 +139,10 @@ export const microphoneOptions: readonly MicrophoneOption[] = [
 ]
 
 export const mockSystemStatus: SystemStatus = {
-  connection: 'excellent',
+  connection: 'offline-demo',
   translationLatencyMs: 780,
   noiseLevel: 'low',
-  translationMode: 'cloud-prototype',
+  translationMode: 'deterministic-mock',
 }
 
 const cloneParticipants = (): Participant[] =>

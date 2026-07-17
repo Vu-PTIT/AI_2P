@@ -1,5 +1,6 @@
 import {
   AudioLines,
+  CircleX,
   Check,
   Ear,
   FilePenLine,
@@ -41,10 +42,15 @@ const statusDetails = {
     icon: TriangleAlert,
     labelKey: 'status.lowConfidence',
   },
+  failed: {
+    tone: 'danger',
+    icon: CircleX,
+    labelKey: 'status.failed',
+  },
 } as const satisfies Record<
   TranslationStatus,
   {
-    tone: 'info' | 'success' | 'warning'
+    tone: 'info' | 'success' | 'warning' | 'danger'
     icon: typeof Ear
     labelKey: TranslationKey
   }
