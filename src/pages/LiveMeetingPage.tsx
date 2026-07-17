@@ -8,7 +8,6 @@ import { MeetingSidebar } from '@/components/meeting/MeetingSidebar'
 import { MeetingStage } from '@/components/meeting/MeetingStage'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
-import { useDemoSimulation } from '@/hooks/useDemoSimulation'
 import { useMeetingClock } from '@/hooks/useMeetingClock'
 import { usePushToTalk } from '@/hooks/usePushToTalk'
 import { useRoomSession } from '@/hooks/useRoomSession'
@@ -31,7 +30,6 @@ export default function LiveMeetingPage() {
   const microphoneEnabled = useMeetingStore(
     (state) => state.microphoneEnabled,
   )
-  const demoStatus = useMeetingStore((state) => state.demoStatus)
   const realtimeStatus = useMeetingStore((state) => state.realtimeSession.status)
   const toggleMicrophone = useMeetingStore((state) => state.toggleMicrophone)
   const setConversationMode = useMeetingStore(
@@ -46,18 +44,9 @@ export default function LiveMeetingPage() {
     meeting.durationSeconds,
   )
   const activePushLanguage = usePushToTalk(meeting.conversationMode)
-  const { runDemo, resetDemo } = useDemoSimulation()
   
   // Quản lý kết nối Socket.IO tới BE và thu âm mic
   const { endSession } = useRealtimeConnection()
-
-  const handleRunOrResetDemo = () => {
-    if (demoStatus === 'idle') {
-      runDemo()
-    } else {
-      resetDemo()
-    }
-  }
 
   const handleEndMeeting = () => {
     endSession()
@@ -100,10 +89,8 @@ export default function LiveMeetingPage() {
         />
         <ConversationFeed
           turns={meeting.turns}
-          onRunDemo={runDemo}
           conversationMode={meeting.conversationMode}
           languageOrder={meeting.languageOrder}
-          demoStatus={demoStatus}
           activePushLanguage={activePushLanguage}
           onToggleMode={() =>
             setConversationMode(
@@ -112,7 +99,6 @@ export default function LiveMeetingPage() {
           }
           onSwapLanguages={swapLanguages}
           onAddNote={() => setNoteDialogOpen(true)}
-          onRunOrResetDemo={handleRunOrResetDemo}
           realtimeStatus={realtimeStatus}
         />
       </main>

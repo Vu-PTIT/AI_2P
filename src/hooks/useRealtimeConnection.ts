@@ -7,7 +7,6 @@ import { AudioStreamer } from '@/lib/audioStreamer'
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ||
   import.meta.env.NEXT_PUBLIC_SOCKET_URL ||
-  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SOCKET_URL) ||
   'https://api-hackathon.dangpham.id.vn'
 
 export function useRealtimeConnection() {

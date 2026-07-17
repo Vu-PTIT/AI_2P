@@ -4,8 +4,6 @@ import {
   AudioLines,
   FilePlus2,
   Languages,
-  Play,
-  RotateCcw,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
@@ -13,7 +11,6 @@ import { useTranslation } from '@/hooks/useTranslation'
 import type {
   ConversationMode,
   ConversationTurn,
-  DemoStatus,
   Language,
   LanguageOrder,
 } from '@/types/meeting'
@@ -122,23 +119,6 @@ export function ConversationFeed({
           >
             {t('meeting.note')}
           </Button>
-          {realtimeStatus !== 'gateway-connected' && (
-            <Button
-              variant={demoStatus === 'idle' ? 'primary' : 'secondary'}
-              size="sm"
-              leadingIcon={
-                demoStatus === 'idle' ? (
-                  <Play className="size-3.5" aria-hidden="true" />
-                ) : (
-                  <RotateCcw className="size-3.5" aria-hidden="true" />
-                )
-              }
-              onClick={onRunOrResetDemo}
-              id="run-demo-control"
-            >
-              {demoStatus === 'idle' ? t('feed.runDemo') : t('feed.reset')}
-            </Button>
-          )}
         </div>
 
         {conversationMode === 'push-to-talk' && (
@@ -179,18 +159,9 @@ export function ConversationFeed({
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-muted">
                   {realtimeStatus === 'gateway-connected'
-                    ? t('feed.pushHint')
+                    ? (conversationMode === 'push-to-talk' ? t('feed.pushHint') : (languageOrder[0] === 'vi' ? 'Bật micro của bạn và bắt đầu nói. Hệ thống sẽ tự động nhận diện lượt nói và dịch thuật.' : 'Turn on your microphone and start speaking. The system will automatically detect and translate.'))
                     : t('feed.readyDescription')}
                 </p>
-                {realtimeStatus !== 'gateway-connected' && (
-                  <Button
-                    variant="primary"
-                    className="mt-5"
-                    onClick={onRunDemo}
-                  >
-                    {t('feed.runScriptedDemo')}
-                  </Button>
-                )}
               </div>
             </div>
           ) : (
