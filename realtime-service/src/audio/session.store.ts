@@ -10,11 +10,13 @@ export type ServerSession = {
   utterances: Array<{
     id: string;
     speaker: 'vi' | 'en';
+    clientId: string | null;              
     sourceText: string;
     translatedText: string;
     timestamp: number;
   }>;
-  clientSockets: Map<string, Socket>; // key = clientId
+  clientSockets: Map<string, Socket>;
+  currentSpeakerClientId: string | null;  
 };
 
 @Injectable()
@@ -30,6 +32,7 @@ export class SessionStore {
       startedAt: new Date(),
       utterances: [],
       clientSockets: new Map(),
+      currentSpeakerClientId: null,        
     };
     this.sessions.set(id, session);
     this.logger.log(`Session created: ${id}`);
@@ -67,5 +70,14 @@ export class SessionStore {
 
   delete(id: string): void {
     this.sessions.delete(id);
+  }
+
+  setCurrentSpeaker(sessionId: string, clientId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (session) session.currentSpeakerClientId = clientId;
+  }
+
+  getCurrentSpeaker(sessionId: string): string | null {
+    return this.sessions.get(sessionId)?.currentSpeakerClientId ?? null;
   }
 }

@@ -13,15 +13,32 @@ export class AiBridgeService {
     private configService: ConfigService,
   ) {}
 
-  openSession(sessionId: string, config: { domain: string; languagePair: string }): void {
+  async openSession(
+    sessionId: string,
+    config: { domain: string; languagePair: string },
+  ): Promise<void> {
     if (this.sockets.has(sessionId)) return;
 
     const aiWsUrl = this.configService.get<string>('AI_WS_URL');
     const aiWs = new WebSocket(`${aiWsUrl}?sessionId=${sessionId}`);
 
-    aiWs.on('open', () => {
-      this.logger.log(`AI ws opened for session ${sessionId}`);
-      aiWs.send(JSON.stringify({ type: 'session.init', config }));
+    // Đợi WS OPEN xong mới return
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('AI worker connect timeout after 5s'));
+      }, 5000);
+
+      aiWs.once('open', () => {
+        clearTimeout(timeout);
+        this.logger.log(`AI ws opened for session ${sessionId}`);
+        aiWs.send(JSON.stringify({ type: 'session.init', config }));
+        resolve();
+      });
+
+      aiWs.once('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
     });
 
     aiWs.on('message', (data: Buffer) => {

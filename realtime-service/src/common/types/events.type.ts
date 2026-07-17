@@ -3,6 +3,7 @@ export type SttPartialEvent = {
   type: 'stt.partial';
   text: string;
   speaker: 'vi' | 'en';
+  clientId: string | null;   // ← THÊM
   utteranceId: string;
 };
 
@@ -10,12 +11,14 @@ export type SttFinalEvent = {
   type: 'stt.final';
   text: string;
   speaker: 'vi' | 'en';
+  clientId: string | null;   // ← THÊM
   utteranceId: string;
 };
 
 export type TranslateTokenEvent = {
   type: 'translate.token';
   token: string;
+  clientId: string | null;   // ← THÊM
   utteranceId: string;
 };
 
@@ -24,6 +27,7 @@ export type TranslateDoneEvent = {
   fullText: string;
   sourceText: string;
   speaker: 'vi' | 'en';
+  clientId: string | null;   // ← THÊM
   utteranceId: string;
 };
 

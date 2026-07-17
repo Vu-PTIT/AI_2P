@@ -33,7 +33,7 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly aiBridge: AiBridgeService,
   ) {}
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     try {
       const sessionId = client.handshake.query?.sessionId as string;
       const clientId = client.handshake.query?.clientId as string;
@@ -52,13 +52,24 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.sessionStore.getOrCreate(sessionId, domain, languagePair);
       this.sessionStore.addClient(sessionId, clientId, client);
-
       client.join(sessionId);
 
-      this.aiBridge.openSession(sessionId, { domain, languagePair });
+      // ⚠️ AWAIT ở đây — đợi WS sang FastAPI OPEN xong
+      try {
+        await this.aiBridge.openSession(sessionId, { domain, languagePair });
+      } catch (err: any) {
+        this.logger.error(`AI bridge open failed for ${sessionId}: ${err.message}`);
+        client.emit('error', {
+          code: 'AI_UNAVAILABLE',
+          message: 'AI worker không phản hồi',
+        });
+        client.disconnect(true);
+        return;
+      }
 
+      // Chỉ emit session.ready SAU khi AI ready
       client.emit('session.ready', { clientId, sessionId });
-      this.logger.log(`Client ${clientId} joined session ${sessionId}`);
+      this.logger.log(`Client ${clientId} joined session ${sessionId} (AI ready)`);
     } catch (e) {
       this.logger.error(`handleConnection error: ${e}`);
       client.disconnect(true);
@@ -81,7 +92,13 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('audio.chunk')
   onAudio(@ConnectedSocket() client: Socket, @MessageBody() chunk: ArrayBuffer) {
     const sessionId = client.data.sessionId;
-    if (!sessionId) return;
+    const clientId = client.data.clientId;
+    if (!sessionId || !clientId) return;
+
+    // Đánh dấu client này là speaker hiện tại
+    // Mỗi chunk audio đến → cập nhật, đảm bảo speaker luôn là người mới nhất đang nói
+    this.sessionStore.setCurrentSpeaker(sessionId, clientId);
+
     this.aiBridge.forwardAudio(sessionId, chunk as any);
   }
 
@@ -108,12 +125,22 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleAiEvent(payload: AiEventPayload) {
     const { sessionId, ...event } = payload;
 
-    this.server.to(sessionId).emit(event.type, event);
+    // Lấy speaker hiện tại của session
+    const currentSpeakerClientId = this.sessionStore.getCurrentSpeaker(sessionId);
+
+    // Chèn clientId vào mọi event trước khi broadcast
+    const enrichedEvent = {
+      ...event,
+      clientId: currentSpeakerClientId,
+    };
+
+    this.server.to(sessionId).emit(event.type, enrichedEvent);
 
     if (event.type === 'translate.done') {
       this.sessionStore.appendUtterance(sessionId, {
         id: event.utteranceId,
         speaker: event.speaker,
+        clientId: currentSpeakerClientId,          // ← THÊM (lưu vào history)
         sourceText: event.sourceText,
         translatedText: event.fullText,
         timestamp: Date.now(),
