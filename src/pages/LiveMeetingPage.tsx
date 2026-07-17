@@ -14,7 +14,6 @@ import { MeetingSidebar } from '@/components/meeting/MeetingSidebar'
 import { MeetingStage } from '@/components/meeting/MeetingStage'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
-import { useDemoSimulation } from '@/hooks/useDemoSimulation'
 import { useMeetingClock } from '@/hooks/useMeetingClock'
 import { usePushToTalk } from '@/hooks/usePushToTalk'
 import { useRoomSession } from '@/hooks/useRoomSession'
@@ -47,7 +46,6 @@ export default function LiveMeetingPage() {
     (state) => state.microphoneEnabled,
   )
   const realtimeStatus = useMeetingStore((state) => state.realtimeSession.status)
-  const demoStatus = useMeetingStore((state) => state.demoStatus)
   const toggleMicrophone = useMeetingStore((state) => state.toggleMicrophone)
   const setConversationMode = useMeetingStore(
     (state) => state.setConversationMode,
@@ -69,15 +67,11 @@ export default function LiveMeetingPage() {
   }, [meeting.status, roomId, navigate])
 
   useEffect(() => {
-    if (meeting.status !== 'live' || realtimeStatus === 'mock') {
+    if (meeting.status !== 'live') {
       return
     }
 
-    const localParticipant =
-      meeting.participants.find(
-        (p) => p.language === meeting.languageOrder[0],
-      ) ?? meeting.participants[0]
-    const participantName = localParticipant?.name || 'Participant'
+    const participantName = useMeetingStore.getState().realtimeSession.clientId
 
     const fetchToken = async () => {
       try {
@@ -104,22 +98,13 @@ export default function LiveMeetingPage() {
     }
 
     fetchToken()
-  }, [meeting.status, realtimeStatus, roomId, meeting.participants, meeting.languageOrder])
+  }, [meeting.status, roomId])
   
   // Quản lý kết nối Socket.IO tới BE và thu âm mic
   const { endSession } = useRealtimeConnection()
-  const { runDemo, resetDemo } = useDemoSimulation()
 
-  const handleRunOrResetDemo = () => {
-    if (demoStatus === 'idle') {
-      runDemo()
-    } else {
-      resetDemo()
-    }
-  }
-
-  const handleEndMeeting = () => {
-    endSession()
+  const handleEndMeeting = async () => {
+    await endSession()
     endMeeting(new Date().toISOString(), elapsedSeconds)
     navigate(ROUTES.summary(roomId))
   }
@@ -143,6 +128,7 @@ export default function LiveMeetingPage() {
 
       <MeetingHeader
         title={meeting.title}
+        roomId={roomId}
         elapsedSeconds={elapsedSeconds}
       />
 
@@ -150,7 +136,7 @@ export default function LiveMeetingPage() {
         id="meeting-conversation"
         className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-meeting-stage md:block md:overflow-y-auto lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(22rem,1fr)] lg:overflow-hidden"
       >
-        {realtimeStatus !== 'mock' && livekitConnected && livekitToken ? (
+        {livekitConnected && livekitToken ? (
           <section className="relative min-h-0 flex-1 bg-meeting-stage p-3 pb-24 md:min-h-[30rem] md:flex-none md:p-5 md:pb-24 lg:h-full lg:min-h-0">
             <div className="relative h-full min-h-[15rem] overflow-hidden rounded-[12px] border border-white/6 bg-slate-950">
               <LiveKitRoom
@@ -192,9 +178,6 @@ export default function LiveMeetingPage() {
           onSwapLanguages={swapLanguages}
           onAddNote={() => setNoteDialogOpen(true)}
           realtimeStatus={realtimeStatus}
-          demoStatus={demoStatus}
-          onRunDemo={runDemo}
-          onRunOrResetDemo={handleRunOrResetDemo}
         />
       </main>
 

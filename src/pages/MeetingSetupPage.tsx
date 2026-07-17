@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 
 import { GlossaryEditor } from '@/components/setup/GlossaryEditor'
 import {
@@ -22,11 +22,13 @@ const API_URL =
 
 export default function MeetingSetupPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { t } = useTranslation()
   const roomId = useRoomSession()
   const startMeeting = useMeetingStore((state) => state.startMeeting)
   const [isActiveSession, setIsActiveSession] = useState(false)
-  const [activeSessionTitle, setActiveSessionTitle] = useState('')
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const isJoining = searchParams.get('join') === '1' || isActiveSession
 
   useEffect(() => {
     if (!roomId) return
@@ -39,13 +41,14 @@ export default function MeetingSetupPage() {
           if (data.exists) {
             setIsActiveSession(true)
             if (data.title) {
-              setActiveSessionTitle(data.title)
               useMeetingStore.getState().setMeetingTitle(data.title)
             }
           }
         }
       } catch (err) {
         console.error('Error checking session status:', err)
+      } finally {
+        setIsCheckingSession(false)
       }
     }
 
@@ -83,16 +86,16 @@ export default function MeetingSetupPage() {
             {t('setup.preparation')}
           </p>
           <h2 className="mt-3 text-balance text-[clamp(2rem,4vw,3.35rem)] font-semibold leading-[1.05] tracking-[-0.045em] text-ink">
-            {t('setup.headline')}
+            {t(isJoining ? 'setup.joinHeadline' : 'setup.headline')}
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-muted-strong">
-            {t('setup.description')}
+            {t(isJoining ? 'setup.joinDescription' : 'setup.description')}
           </p>
         </div>
 
-        <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(22rem,5fr)] lg:items-start xl:gap-14">
-          <MeetingDetailsForm onValidSubmit={handleStartMeeting} isActiveSession={isActiveSession} />
-          <GlossaryEditor />
+        <div className={isJoining ? 'mt-10 max-w-3xl' : 'mt-10 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(22rem,5fr)] lg:items-start xl:gap-14'}>
+          <MeetingDetailsForm onValidSubmit={handleStartMeeting} isJoining={isJoining} />
+          {!isJoining && <GlossaryEditor />}
         </div>
 
         <div className="mt-10 flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
@@ -105,12 +108,13 @@ export default function MeetingSetupPage() {
             variant="primary"
             size="lg"
             fullWidth
+            disabled={isCheckingSession && searchParams.get('join') !== '1'}
             trailingIcon={
               <ArrowRight aria-hidden="true" className="size-4" />
             }
             className="sm:w-auto"
           >
-            {isActiveSession ? t('setup.join') : t('setup.start')}
+            {isJoining ? t('setup.join') : t('setup.start')}
           </Button>
         </div>
       </main>

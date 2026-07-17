@@ -11,6 +11,7 @@ export interface SttPartialEvent {
   text: string
   speaker: Language
   utteranceId: string
+  clientId?: string | null
 }
 
 export interface SttFinalEvent {
@@ -18,12 +19,14 @@ export interface SttFinalEvent {
   text: string
   speaker: Language
   utteranceId: string
+  clientId?: string | null
 }
 
 export interface TranslateTokenEvent {
   type: 'translate.token'
   token: string
   utteranceId: string
+  clientId?: string | null
 }
 
 export interface TranslateDoneEvent {
@@ -32,6 +35,7 @@ export interface TranslateDoneEvent {
   sourceText: string
   speaker: Language
   utteranceId: string
+  clientId?: string | null
 }
 
 export interface SessionEndedEvent {
@@ -57,7 +61,7 @@ export type RealtimeServerEvent =
   | RealtimeErrorEvent
 
 export type RealtimeSessionStatus =
-  | 'mock'
+  | 'connecting'
   | 'gateway-connected'
   | 'ended'
   | 'error'

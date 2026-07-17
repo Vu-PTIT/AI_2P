@@ -41,7 +41,11 @@ export class AudioStreamer {
 
     const AudioContextClass =
       window.AudioContext ||
-      ((window as any).webkitAudioContext as typeof AudioContext)
+      (window as Window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext
+    if (!AudioContextClass) {
+      throw new Error('Web Audio API is not supported in this browser')
+    }
     this.audioContext = new AudioContextClass()
     const sourceSampleRate = this.audioContext.sampleRate
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { createInitialMeeting, createDemoMeeting } from '../data/mockMeeting'
+import { createInitialMeeting } from '../data/initialMeeting'
 import { clamp, createEntityId } from '../lib/utils'
 import { getOrCreateClientId } from '../lib/meetingIdentity'
 import { applyRealtimeTranscriptEvent } from '../lib/realtimeEvents'
@@ -7,7 +7,6 @@ import type {
   ConversationMode,
   ConversationTurn,
   ConversationTurnUpdate,
-  DemoStatus,
   GlossaryTermInput,
   GlossaryTermUpdate,
   Language,
@@ -28,8 +27,6 @@ export interface MeetingStoreState {
   microphoneTestStatus: MicrophoneTestStatus
   audioInputLevel: number
   noiseLevel: NoiseLevel
-  demoStatus: DemoStatus
-  demoRunId: number
   activeTurnId: string | null
   realtimeSession: RealtimeSessionState
 }
@@ -63,11 +60,7 @@ export interface MeetingStoreActions {
   startMeeting: (startedAt?: string) => void
   endMeeting: (endedAt?: string, durationSeconds?: number) => void
   prepareAnotherMeeting: () => void
-  resetMeeting: (isDemo?: boolean) => void
-  setDemoStatus: (status: DemoStatus) => void
-  beginDemo: () => number
-  completeDemo: () => void
-  resetDemo: () => void
+  resetMeeting: () => void
   setActiveTurnId: (turnId: string | null) => void
   applyRealtimeEvent: (
     event: RealtimeServerEvent,
@@ -95,18 +88,16 @@ const calculateDurationSeconds = (
   return Math.max(0, Math.floor((endTime - startTime) / 1_000))
 }
 
-const createInitialStoreState = (isDemo = false): MeetingStoreState => ({
-  meeting: isDemo ? createDemoMeeting() : createInitialMeeting(),
+const createInitialStoreState = (): MeetingStoreState => ({
+  meeting: createInitialMeeting(),
   microphoneEnabled: true,
   microphoneTestStatus: 'idle',
   audioInputLevel: 0,
   noiseLevel: 'low',
-  demoStatus: 'idle',
-  demoRunId: 0,
   activeTurnId: null,
   realtimeSession: {
     clientId: getOrCreateClientId(),
-    status: 'mock',
+    status: 'connecting',
     lastError: null,
   },
 })
@@ -397,12 +388,10 @@ export const useMeetingStore = create<MeetingStore>()((set) => ({
         endedAt: null,
         durationSeconds: 0,
       },
-      demoStatus: 'idle',
-      demoRunId: state.demoRunId + 1,
       activeTurnId: null,
       realtimeSession: {
         ...state.realtimeSession,
-        status: 'mock',
+        status: 'connecting',
         lastError: null,
       },
     }))
@@ -421,9 +410,6 @@ export const useMeetingStore = create<MeetingStore>()((set) => ({
           durationSeconds ??
           calculateDurationSeconds(state.meeting.startedAt, endedAt),
       },
-      demoStatus:
-        state.demoStatus === 'running' ? 'complete' : state.demoStatus,
-      demoRunId: state.demoRunId + 1,
       activeTurnId: null,
     }))
   },
@@ -442,66 +428,17 @@ export const useMeetingStore = create<MeetingStore>()((set) => ({
       microphoneEnabled: true,
       microphoneTestStatus: 'idle',
       audioInputLevel: 0,
-      demoStatus: 'idle',
-      demoRunId: state.demoRunId + 1,
       activeTurnId: null,
-    }))
-  },
-
-  resetMeeting: (isDemo = false) => {
-    const initialState = createInitialStoreState(isDemo)
-
-    set((state) => ({
-      ...initialState,
-      demoRunId: state.demoRunId + 1,
-    }))
-  },
-
-  setDemoStatus: (demoStatus) => {
-    set({ demoStatus })
-  },
-
-  beginDemo: () => {
-    let nextRunId = 0
-
-    set((state) => {
-      nextRunId = state.demoRunId + 1
-
-      return {
-        meeting: {
-          ...state.meeting,
-          turns: [],
-          status: 'live',
-          startedAt: state.meeting.startedAt ?? new Date().toISOString(),
-          endedAt: null,
-          durationSeconds: 0,
-        },
-        demoStatus: 'running',
-        demoRunId: nextRunId,
-        activeTurnId: null,
-      }
-    })
-
-    return nextRunId
-  },
-
-  completeDemo: () => {
-    set({
-      demoStatus: 'complete',
-      activeTurnId: null,
-    })
-  },
-
-  resetDemo: () => {
-    set((state) => ({
-      meeting: {
-        ...state.meeting,
-        turns: [],
+      realtimeSession: {
+        ...state.realtimeSession,
+        status: 'connecting',
+        lastError: null,
       },
-      demoStatus: 'idle',
-      demoRunId: state.demoRunId + 1,
-      activeTurnId: null,
     }))
+  },
+
+  resetMeeting: () => {
+    set(createInitialStoreState())
   },
 
   setActiveTurnId: (activeTurnId) => {

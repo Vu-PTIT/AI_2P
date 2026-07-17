@@ -23,7 +23,7 @@ type TouchedFields = Record<RequiredField, boolean>
 
 interface MeetingDetailsFormProps {
   onValidSubmit: () => void
-  isActiveSession?: boolean
+  isJoining?: boolean
 }
 
 const initialTouchedFields: TouchedFields = {
@@ -53,7 +53,7 @@ const modeOptions: readonly {
 
 export function MeetingDetailsForm({
   onValidSubmit,
-  isActiveSession = false,
+  isJoining = false,
 }: MeetingDetailsFormProps) {
   const { t } = useTranslation()
   const meeting = useMeetingStore((state) => state.meeting)
@@ -106,7 +106,7 @@ export function MeetingDetailsForm({
     event.preventDefault()
 
     const allTouched: TouchedFields = {
-      title: !isActiveSession,
+      title: !isJoining,
       userName: true,
     }
     setTouched(allTouched)
@@ -115,7 +115,7 @@ export function MeetingDetailsForm({
       Object.keys(fieldValues) as RequiredField[]
     ).some(
       (field) => {
-        if (isActiveSession && field === 'title') return false
+        if (isJoining && field === 'title') return false
         return getRequiredError(fieldLabels[field], fieldValues[field]) !== null
       }
     )
@@ -125,7 +125,7 @@ export function MeetingDetailsForm({
     }
   }
 
-  const titleError = isActiveSession ? null : getVisibleError('title')
+  const titleError = isJoining ? null : getVisibleError('title')
 
   return (
     <form
@@ -143,17 +143,17 @@ export function MeetingDetailsForm({
             id="meeting-details-heading"
             className="mt-2 text-xl font-semibold tracking-tight text-ink"
           >
-            {isActiveSession ? t('details.joinTitle') : t('details.title')}
+            {isJoining ? t('details.joinTitle') : t('details.title')}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            {isActiveSession ? t('details.joinDescription') : t('details.description')}
+            {isJoining ? t('details.joinDescription') : t('details.description')}
           </p>
         </div>
 
-        <FormField
+        {!isJoining && <FormField
           htmlFor="meeting-title"
           label={t('details.meetingTitle')}
-          required={!isActiveSession}
+          required
           error={titleError ?? undefined}
           description={t('details.meetingTitleDescription')}
         >
@@ -166,14 +166,12 @@ export function MeetingDetailsForm({
             aria-describedby="meeting-title-support"
             maxLength={MAX_MEETING_TITLE_LENGTH}
             autoComplete="off"
-            disabled={isActiveSession}
             className={cn(
               inputClassName,
               titleError ? 'border-danger' : 'border-line-strong',
-              isActiveSession && 'bg-panel-muted/60 cursor-not-allowed opacity-85 text-muted-strong'
             )}
           />
-        </FormField>
+        </FormField>}
 
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <FormField
@@ -250,7 +248,7 @@ export function MeetingDetailsForm({
         </div>
       </section>
 
-      <section
+      {!isJoining && <section
         aria-labelledby="conversation-mode-heading"
         className="mt-8 border-t border-line pt-7"
       >
@@ -307,7 +305,7 @@ export function MeetingDetailsForm({
             )
           })}
         </fieldset>
-      </section>
+      </section>}
 
       <div className="mt-8">
         <MicrophoneTest />

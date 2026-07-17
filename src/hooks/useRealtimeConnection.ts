@@ -21,6 +21,7 @@ export function useRealtimeConnection() {
 
   const { id: roomId, status: meetingStatus, languageOrder } = meeting
   const { clientId } = realtimeSession
+  const gatewayReady = realtimeSession.status === 'gateway-connected'
   const speaker = languageOrder[0] // Trình duyệt này nói ngôn ngữ đầu tiên trong list
 
   // Quản lý kết nối Socket.IO
@@ -45,7 +46,9 @@ export function useRealtimeConnection() {
         title: meeting.title,
       },
       transports: ['websocket'],
-      reconnection: false,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1_000,
     })
 
     socketRef.current = socket
@@ -70,6 +73,7 @@ export function useRealtimeConnection() {
         text: data.text,
         speaker: data.speaker,
         utteranceId: data.utteranceId,
+        clientId: data.clientId,
       })
     })
 
@@ -79,6 +83,7 @@ export function useRealtimeConnection() {
         text: data.text,
         speaker: data.speaker,
         utteranceId: data.utteranceId,
+        clientId: data.clientId,
       })
     })
 
@@ -87,6 +92,7 @@ export function useRealtimeConnection() {
         type: 'translate.token',
         token: data.token,
         utteranceId: data.utteranceId,
+        clientId: data.clientId,
       })
     })
 
@@ -97,6 +103,7 @@ export function useRealtimeConnection() {
         sourceText: data.sourceText,
         speaker: data.speaker,
         utteranceId: data.utteranceId,
+        clientId: data.clientId,
       })
     })
 
@@ -118,8 +125,15 @@ export function useRealtimeConnection() {
 
     socket.on('disconnect', () => {
       console.log('Socket.IO disconnected')
-      applyRealtimeEvent({ type: 'session.ended' })
       socketRef.current = null
+    })
+
+    socket.on('connect_error', (err) => {
+      applyRealtimeEvent({
+        type: 'error',
+        code: 'GATEWAY_CONNECTION_FAILED',
+        message: err.message,
+      })
     })
 
     return () => {
@@ -128,7 +142,7 @@ export function useRealtimeConnection() {
         socketRef.current = null
       }
     }
-  }, [meetingStatus, roomId, clientId, applyRealtimeEvent, speaker])
+  }, [meetingStatus, roomId, clientId, meeting.title, languageOrder, applyRealtimeEvent, speaker])
 
   // Đồng bộ speaker switch khi ngôn ngữ thay đổi trong phòng
   useEffect(() => {
@@ -148,8 +162,8 @@ export function useRealtimeConnection() {
     const isLive = meetingStatus === 'live'
 
     // Cần bật mic và đang họp trực tuyến
-    if (isLive && microphoneEnabled) {
-      let activeStreamer = streamerRef.current
+    if (isLive && microphoneEnabled && gatewayReady) {
+      const activeStreamer = streamerRef.current
 
       const startStreamer = async () => {
         try {
@@ -206,13 +220,21 @@ export function useRealtimeConnection() {
         streamerRef.current = null
       }
     }
-  }, [meetingStatus, microphoneEnabled, speaker, setAudioInputLevel])
+  }, [meetingStatus, microphoneEnabled, gatewayReady, speaker, setAudioInputLevel])
 
   // Hàm thủ công kết thúc phiên
-  const endSession = () => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('session.end')
-    }
+  const endSession = (): Promise<void> => {
+    const socket = socketRef.current
+    if (!socket?.connected) return Promise.resolve()
+
+    return new Promise((resolve) => {
+      const timeoutId = window.setTimeout(resolve, 1_500)
+      socket.once('session.ended', () => {
+        window.clearTimeout(timeoutId)
+        resolve()
+      })
+      socket.emit('session.end')
+    })
   }
 
   return { endSession }

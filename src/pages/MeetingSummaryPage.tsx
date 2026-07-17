@@ -16,9 +16,6 @@ import { LocaleSwitcher } from '@/components/layout/LocaleSwitcher'
 import { ConversationTurnCard } from '@/components/meeting/ConversationTurnCard'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import {
-  mockConversationTurns,
-} from '@/data/mockMeeting'
 import { useClipboard } from '@/hooks/useClipboard'
 import { useRoomSession } from '@/hooks/useRoomSession'
 import { useTranslation } from '@/hooks/useTranslation'
@@ -44,56 +41,15 @@ export default function MeetingSummaryPage() {
     (state) => state.prepareAnotherMeeting,
   )
   const { copy, copyState } = useClipboard()
-  const isDirectPreview =
-    meeting.status === 'setup' && meeting.turns.length === 0
-  const displayedTurns = isDirectPreview
-    ? [...mockConversationTurns]
-    : meeting.turns
-  const displayedDuration = isDirectPreview
-    ? 64
-    : meeting.durationSeconds
-
-  const displayedNotes = isDirectPreview
-    ? [
-        {
-          id: 'mock-note-1',
-          text: locale === 'vi' ? 'Quyết định: Thời lượng thử nghiệm đề xuất là ba tháng.' : 'Decision: The proposed pilot duration is three months.',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'mock-note-2',
-          text: locale === 'vi' ? 'Việc cần làm: Nguyễn Minh chuẩn bị đề xuất kỹ thuật.' : 'Todo: Nguyễn Minh prepare the technical proposal.',
-          createdAt: new Date().toISOString(),
-        }
-      ]
-    : meeting.notes
+  const displayedTurns = meeting.turns
+  const displayedDuration = meeting.durationSeconds
+  const displayedNotes = meeting.notes
 
   let summaryText = ''
-  let actionItems: ActionItem[] = []
-  let decisions: string[] = []
+  let actionItems: ActionItem[]
+  let decisions: string[]
 
-  if (isDirectPreview) {
-    summaryText = t('summary.text')
-    actionItems = [
-      {
-        id: 'action-technical-proposal',
-        title: t('summary.actionOne'),
-        owner: 'Nguyễn Minh',
-        status: 'open',
-      },
-      {
-        id: 'action-review-resources',
-        title: t('summary.actionTwo'),
-        owner: 'James Tan',
-        status: 'open',
-      },
-    ] satisfies readonly ActionItem[]
-    decisions = [
-      t('summary.decisionOne'),
-      t('summary.decisionTwo'),
-    ]
-  } else {
-    // Generate dynamic summary text
+  {
     if (displayedTurns.length === 0 && displayedNotes.length === 0) {
       summaryText = t('summary.emptyTitle')
     } else {

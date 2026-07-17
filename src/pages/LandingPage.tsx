@@ -1,33 +1,36 @@
-import { ArrowRight, Play, ShieldCheck } from 'lucide-react'
+import { ArrowRight, ShieldCheck } from 'lucide-react'
+import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 
 import { BenefitStrip } from '@/components/landing/BenefitStrip'
 import { ConversationPreview } from '@/components/landing/ConversationPreview'
 import { BrandMark } from '@/components/layout/BrandMark'
 import { PublicHeader } from '@/components/layout/PublicHeader'
+import { FormField } from '@/components/ui/FormField'
 import { Button } from '@/components/ui/Button'
 import { useTranslation } from '@/hooks/useTranslation'
 import { ROUTES } from '@/lib/constants'
-import { createRoomId } from '@/lib/meetingIdentity'
 import { useMeetingStore } from '@/store/meetingStore'
 
 export default function LandingPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const [roomCode, setRoomCode] = useState('')
 
   const handleStartMeeting = () => {
     navigate(ROUTES.create)
   }
 
-  const handleViewDemo = () => {
-    const roomId = createRoomId()
-    const { resetMeeting, setMeetingId, startMeeting } =
-      useMeetingStore.getState()
+  const handleJoinMeeting = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
 
-    resetMeeting(true)
-    setMeetingId(roomId)
-    startMeeting()
-    navigate(ROUTES.meeting(roomId))
+    const normalizedRoomId = roomCode.trim()
+    if (!normalizedRoomId) {
+      return
+    }
+
+    useMeetingStore.getState().resetMeeting()
+    navigate(ROUTES.joinSetup(normalizedRoomId))
   }
 
   return (
@@ -69,21 +72,48 @@ export default function LandingPage() {
               >
                 {t('nav.startMeeting')}
               </Button>
-              <Button
-                leadingIcon={
-                  <Play
-                    aria-hidden="true"
-                    className="size-4 fill-current"
-                  />
-                }
-                onClick={handleViewDemo}
-                size="lg"
-                variant="secondary"
-                className="w-full sm:w-auto"
-              >
-                {t('landing.viewDemo')}
-              </Button>
             </div>
+
+            <section id="join-room" className="mt-10 max-w-xl rounded-[20px] border border-line bg-panel/80 p-5 backdrop-blur-sm scroll-mt-24">
+              <p className="text-[0.6875rem] font-semibold tracking-[0.16em] text-primary uppercase">
+                {t('landing.joinEyebrow')}
+              </p>
+              <h2 className="mt-3 text-lg font-semibold tracking-[-0.02em] text-ink">
+                {t('landing.joinTitle')}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                {t('landing.joinDescription')}
+              </p>
+
+              <form onSubmit={handleJoinMeeting} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <FormField
+                  htmlFor="room-code"
+                  label={t('landing.roomCodeLabel')}
+                  description={t('landing.roomCodeHint')}
+                >
+                  <input
+                    id="room-code"
+                    value={roomCode}
+                    onChange={(event) => setRoomCode(event.target.value)}
+                    autoComplete="off"
+                    placeholder={t('landing.roomCodePlaceholder')}
+                    className="h-12 w-full rounded-[10px] border border-line-strong bg-canvas px-3.5 text-base text-ink placeholder:text-muted transition-colors hover:border-muted focus:border-primary"
+                  />
+                </FormField>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  variant="primary"
+                  trailingIcon={
+                    <ArrowRight aria-hidden="true" className="size-4" />
+                  }
+                  className="sm:min-w-40"
+                >
+                  {t('landing.joinButton')}
+                </Button>
+              </form>
+            </section>
 
             <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-5 text-xs text-muted">
               <span>{t('common.languagePair')}</span>
