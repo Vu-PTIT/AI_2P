@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { createInitialMeeting } from '../data/mockMeeting'
+import { createInitialMeeting, createDemoMeeting } from '../data/mockMeeting'
 import { clamp, createEntityId } from '../lib/utils'
 import { getOrCreateClientId } from '../lib/meetingIdentity'
 import { applyRealtimeTranscriptEvent } from '../lib/realtimeEvents'
@@ -63,7 +63,7 @@ export interface MeetingStoreActions {
   startMeeting: (startedAt?: string) => void
   endMeeting: (endedAt?: string, durationSeconds?: number) => void
   prepareAnotherMeeting: () => void
-  resetMeeting: () => void
+  resetMeeting: (isDemo?: boolean) => void
   setDemoStatus: (status: DemoStatus) => void
   beginDemo: () => number
   completeDemo: () => void
@@ -95,8 +95,8 @@ const calculateDurationSeconds = (
   return Math.max(0, Math.floor((endTime - startTime) / 1_000))
 }
 
-const createInitialStoreState = (): MeetingStoreState => ({
-  meeting: createInitialMeeting(),
+const createInitialStoreState = (isDemo = false): MeetingStoreState => ({
+  meeting: isDemo ? createDemoMeeting() : createInitialMeeting(),
   microphoneEnabled: true,
   microphoneTestStatus: 'idle',
   audioInputLevel: 0,
@@ -448,8 +448,8 @@ export const useMeetingStore = create<MeetingStore>()((set) => ({
     }))
   },
 
-  resetMeeting: () => {
-    const initialState = createInitialStoreState()
+  resetMeeting: (isDemo = false) => {
+    const initialState = createInitialStoreState(isDemo)
 
     set((state) => ({
       ...initialState,

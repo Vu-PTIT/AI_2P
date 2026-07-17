@@ -11,13 +11,13 @@ import { useTranslation } from '@/hooks/useTranslation'
 import type { TranslationKey } from '@/i18n/translations'
 import { cn } from '@/lib/utils'
 import { useMeetingStore } from '@/store/meetingStore'
-import type { ConversationMode, Language } from '@/types/meeting'
+import type { ConversationMode } from '@/types/meeting'
 
 import { MicrophoneTest } from './MicrophoneTest'
 
 export const MEETING_SETUP_FORM_ID = 'meeting-setup-form'
 
-type RequiredField = 'title' | Language
+type RequiredField = 'title' | 'userName'
 
 type TouchedFields = Record<RequiredField, boolean>
 
@@ -27,8 +27,7 @@ interface MeetingDetailsFormProps {
 
 const initialTouchedFields: TouchedFields = {
   title: false,
-  vi: false,
-  en: false,
+  userName: false,
 }
 
 const inputClassName =
@@ -65,26 +64,23 @@ export function MeetingDetailsForm({
   const setConversationMode = useMeetingStore(
     (state) => state.setConversationMode,
   )
+  const swapLanguages = useMeetingStore((state) => state.swapLanguages)
   const [touched, setTouched] =
     useState<TouchedFields>(initialTouchedFields)
 
-  const vietnameseParticipant =
-    meeting.participants.find((participant) => participant.language === 'vi')
-      ?.name ?? ''
-  const englishParticipant =
-    meeting.participants.find((participant) => participant.language === 'en')
+  const userLanguage = meeting.languageOrder[0]
+  const userName =
+    meeting.participants.find((participant) => participant.language === userLanguage)
       ?.name ?? ''
 
   const fieldValues: Record<RequiredField, string> = {
     title: meeting.title,
-    vi: vietnameseParticipant,
-    en: englishParticipant,
+    userName: userName,
   }
 
   const fieldLabels: Record<RequiredField, string> = {
     title: t('details.meetingTitle'),
-    vi: t('details.vietnameseParticipant'),
-    en: t('details.englishParticipant'),
+    userName: t('details.yourName'),
   }
 
   const getRequiredError = (label: string, value: string): string | null =>
@@ -109,8 +105,7 @@ export function MeetingDetailsForm({
 
     const allTouched: TouchedFields = {
       title: true,
-      vi: true,
-      en: true,
+      userName: true,
     }
     setTouched(allTouched)
 
@@ -124,53 +119,6 @@ export function MeetingDetailsForm({
     if (!hasError) {
       onValidSubmit()
     }
-  }
-
-  const renderParticipantField = (
-    language: Language,
-    value: string,
-    accentClassName: string,
-  ) => {
-    const error = getVisibleError(language)
-    const inputId = `participant-${language}`
-
-    return (
-      <FormField
-        htmlFor={inputId}
-        label={`${fieldLabels[language]} · ${language.toUpperCase()}`}
-        required
-        error={error ?? undefined}
-      >
-        <div className="relative">
-          <span
-            aria-hidden="true"
-            className={cn(
-              'absolute inset-y-3 left-0 w-0.5 rounded-full',
-              accentClassName,
-            )}
-          />
-          <input
-            id={inputId}
-            value={value}
-            onChange={(event) =>
-              setParticipantNameByLanguage(language, event.target.value)
-            }
-            onBlur={() => markTouched(language)}
-            aria-invalid={error !== null}
-            aria-describedby={
-              error ? `${inputId}-support` : undefined
-            }
-            maxLength={MAX_PARTICIPANT_NAME_LENGTH}
-            autoComplete="name"
-            className={cn(
-              inputClassName,
-              'pl-4',
-              error ? 'border-danger' : 'border-line-strong',
-            )}
-          />
-        </div>
-      </FormField>
-    )
   }
 
   const titleError = getVisibleError('title')
@@ -222,16 +170,77 @@ export function MeetingDetailsForm({
         </FormField>
 
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          {renderParticipantField(
-            'vi',
-            vietnameseParticipant,
-            'bg-vietnamese',
-          )}
-          {renderParticipantField(
-            'en',
-            englishParticipant,
-            'bg-english',
-          )}
+          <FormField
+            htmlFor="user-name"
+            label={t('details.yourName')}
+            required
+            error={getVisibleError('userName') ?? undefined}
+          >
+            <input
+              id="user-name"
+              value={userName}
+              onChange={(event) => {
+                const val = event.target.value
+                setParticipantNameByLanguage(userLanguage, val)
+                const otherLang = userLanguage === 'vi' ? 'en' : 'vi'
+                setParticipantNameByLanguage(otherLang, '')
+              }}
+              onBlur={() => markTouched('userName')}
+              aria-invalid={getVisibleError('userName') !== null}
+              maxLength={MAX_PARTICIPANT_NAME_LENGTH}
+              autoComplete="name"
+              className={cn(
+                inputClassName,
+                'pl-4 border-line-strong',
+                getVisibleError('userName') ? 'border-danger' : '',
+              )}
+            />
+          </FormField>
+
+          <FormField
+            htmlFor="user-language"
+            label={t('details.yourLanguage')}
+            required
+          >
+            <div className="grid grid-cols-2 gap-2 h-12">
+              <button
+                type="button"
+                onClick={() => {
+                  if (userLanguage !== 'vi') {
+                    setParticipantNameByLanguage('vi', userName)
+                    setParticipantNameByLanguage('en', '')
+                    swapLanguages()
+                  }
+                }}
+                className={cn(
+                  'flex items-center justify-center rounded-[10px] border text-sm font-semibold transition-colors cursor-pointer',
+                  userLanguage === 'vi'
+                    ? 'border-vietnamese/80 bg-vietnamese/10 text-vietnamese-soft'
+                    : 'border-line bg-panel hover:border-line-strong text-muted',
+                )}
+              >
+                {t('details.vietnamese')} · VI
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (userLanguage !== 'en') {
+                    setParticipantNameByLanguage('en', userName)
+                    setParticipantNameByLanguage('vi', '')
+                    swapLanguages()
+                  }
+                }}
+                className={cn(
+                  'flex items-center justify-center rounded-[10px] border text-sm font-semibold transition-colors cursor-pointer',
+                  userLanguage === 'en'
+                    ? 'border-english/80 bg-english/10 text-english-soft'
+                    : 'border-line bg-panel hover:border-line-strong text-muted',
+                )}
+              >
+                {t('details.english')} · EN
+              </button>
+            </div>
+          </FormField>
         </div>
       </section>
 

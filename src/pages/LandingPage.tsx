@@ -24,7 +24,7 @@ export default function LandingPage() {
     const { resetMeeting, setMeetingId, startMeeting } =
       useMeetingStore.getState()
 
-    resetMeeting()
+    resetMeeting(true)
     setMeetingId(roomId)
     startMeeting()
     navigate(ROUTES.meeting(roomId))

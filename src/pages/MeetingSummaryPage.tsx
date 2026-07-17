@@ -52,25 +52,137 @@ export default function MeetingSummaryPage() {
   const displayedDuration = isDirectPreview
     ? 64
     : meeting.durationSeconds
-  const summaryText = t('summary.text')
-  const actionItems = [
-    {
-      id: 'action-technical-proposal',
-      title: t('summary.actionOne'),
-      owner: 'Nguyễn Minh',
-      status: 'open',
-    },
-    {
-      id: 'action-review-resources',
-      title: t('summary.actionTwo'),
-      owner: 'James Tan',
-      status: 'open',
-    },
-  ] satisfies readonly ActionItem[]
-  const decisions = [
-    t('summary.decisionOne'),
-    t('summary.decisionTwo'),
-  ]
+
+  const displayedNotes = isDirectPreview
+    ? [
+        {
+          id: 'mock-note-1',
+          text: locale === 'vi' ? 'Quyết định: Thời lượng thử nghiệm đề xuất là ba tháng.' : 'Decision: The proposed pilot duration is three months.',
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'mock-note-2',
+          text: locale === 'vi' ? 'Việc cần làm: Nguyễn Minh chuẩn bị đề xuất kỹ thuật.' : 'Todo: Nguyễn Minh prepare the technical proposal.',
+          createdAt: new Date().toISOString(),
+        }
+      ]
+    : meeting.notes
+
+  let summaryText = ''
+  let actionItems: ActionItem[] = []
+  let decisions: string[] = []
+
+  if (isDirectPreview) {
+    summaryText = t('summary.text')
+    actionItems = [
+      {
+        id: 'action-technical-proposal',
+        title: t('summary.actionOne'),
+        owner: 'Nguyễn Minh',
+        status: 'open',
+      },
+      {
+        id: 'action-review-resources',
+        title: t('summary.actionTwo'),
+        owner: 'James Tan',
+        status: 'open',
+      },
+    ] satisfies readonly ActionItem[]
+    decisions = [
+      t('summary.decisionOne'),
+      t('summary.decisionTwo'),
+    ]
+  } else {
+    // Generate dynamic summary text
+    if (displayedTurns.length === 0 && displayedNotes.length === 0) {
+      summaryText = t('summary.emptyTitle')
+    } else {
+      const isVi = locale === 'vi'
+      summaryText = isVi
+        ? `Cuộc họp "${meeting.title}" đã kết thúc với ${displayedTurns.length} lượt hội thoại song ngữ.`
+        : `The meeting "${meeting.title}" completed with ${displayedTurns.length} bilingual conversation turns.`
+      
+      if (meeting.participants && meeting.participants.length > 0) {
+        const participantNames = meeting.participants.map(p => p.name).filter(Boolean).join(', ')
+        if (participantNames) {
+          summaryText += isVi
+            ? ` Thành viên tham gia thảo luận: ${participantNames}.`
+            : ` Participants: ${participantNames}.`
+        }
+      }
+      
+      if (displayedNotes.length > 0) {
+        summaryText += isVi
+          ? ` Các ghi chú trong cuộc họp: ${displayedNotes.map(n => n.text).join('; ')}.`
+          : ` Notes recorded: ${displayedNotes.map(n => n.text).join('; ')}.`
+      }
+    }
+
+    // Generate dynamic action items from notes
+    const actionNotes = displayedNotes.filter(n => {
+      const textLower = n.text.toLowerCase()
+      return textLower.includes('việc cần làm') || textLower.includes('cần làm') || textLower.includes('todo') || textLower.includes('action') || textLower.includes('task')
+    })
+    
+    actionItems = actionNotes.map((note, index) => {
+      let owner = locale === 'vi' ? 'Chưa phân công' : 'Unassigned'
+      if (meeting.participants) {
+        for (const p of meeting.participants) {
+          if (p.name && note.text.toLowerCase().includes(p.name.toLowerCase())) {
+            owner = p.name
+            break
+          }
+        }
+      }
+      
+      let title = note.text
+      const prefixes = [
+        'việc cần làm:', 'việc cần làm', 'cần làm:', 'cần làm',
+        'todo:', 'todo', 'action:', 'action', 'task:', 'task'
+      ]
+      for (const prefix of prefixes) {
+        if (title.toLowerCase().startsWith(prefix)) {
+          title = title.substring(prefix.length).trim()
+          if (title.startsWith(':') || title.startsWith('-')) {
+            title = title.substring(1).trim()
+          }
+          break
+        }
+      }
+      title = title.charAt(0).toUpperCase() + title.slice(1)
+      
+      return {
+        id: `action-dynamic-${index}`,
+        title,
+        owner,
+        status: 'open' as const,
+      }
+    })
+
+    // Generate dynamic decisions from notes
+    const decisionNotes = displayedNotes.filter(n => {
+      const textLower = n.text.toLowerCase()
+      return textLower.includes('quyết định') || textLower.includes('decision') || textLower.includes('thống nhất') || textLower.includes('agree')
+    })
+    
+    decisions = decisionNotes.map(note => {
+      let title = note.text
+      const prefixes = [
+        'quyết định:', 'quyết định', 'decision:', 'decision',
+        'thống nhất:', 'thống nhất'
+      ]
+      for (const prefix of prefixes) {
+        if (title.toLowerCase().startsWith(prefix)) {
+          title = title.substring(prefix.length).trim()
+          if (title.startsWith(':') || title.startsWith('-')) {
+            title = title.substring(1).trim()
+          }
+          break
+        }
+      }
+      return title.charAt(0).toUpperCase() + title.slice(1)
+    })
+  }
 
   const downloadTranscript = () => {
     const exportMeeting = {
@@ -214,24 +326,30 @@ export default function MeetingSummaryPage() {
             >
               {t('summary.actionItems')}
             </h2>
-            <ol className="mt-4 divide-y divide-line">
-              {actionItems.map((item, index) => (
-                <li key={item.id} className="grid gap-3 py-4 first:pt-1">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 text-xs font-bold tabular-nums text-muted">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    <p className="text-sm font-semibold leading-6 text-ink-soft">
-                      {item.title}
-                    </p>
-                  </div>
-                  <div className="ml-7 flex items-center justify-between gap-3">
-                    <span className="text-xs text-muted">{item.owner}</span>
-                    <StatusBadge tone="warning">{t('common.open')}</StatusBadge>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            {actionItems.length === 0 ? (
+              <p className="mt-4 text-xs text-muted leading-relaxed">
+                {t('summary.noActionItems')}
+              </p>
+            ) : (
+              <ol className="mt-4 divide-y divide-line">
+                {actionItems.map((item, index) => (
+                  <li key={item.id} className="grid gap-3 py-4 first:pt-1">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 text-xs font-bold tabular-nums text-muted">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <p className="text-sm font-semibold leading-6 text-ink-soft">
+                        {item.title}
+                      </p>
+                    </div>
+                    <div className="ml-7 flex items-center justify-between gap-3">
+                      <span className="text-xs text-muted">{item.owner}</span>
+                      <StatusBadge tone="warning">{t('common.open')}</StatusBadge>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
         </div>
 
@@ -251,19 +369,60 @@ export default function MeetingSummaryPage() {
                 {t('summary.decisions')}
               </h2>
             </div>
-            <ol className="grid gap-3 sm:grid-cols-2">
-              {decisions.map((decision, index) => (
-                <li
-                  key={decision}
-                  className="flex gap-4 border-l border-line-strong pl-4 text-sm leading-6 text-ink-soft"
-                >
-                  <span className="font-bold text-primary">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  {decision}
-                </li>
-              ))}
-            </ol>
+            {decisions.length === 0 ? (
+              <p className="text-xs text-muted pl-4">
+                {t('summary.noDecisions')}
+              </p>
+            ) : (
+              <ol className="grid gap-3 sm:grid-cols-2">
+                {decisions.map((decision, index) => (
+                  <li
+                    key={decision}
+                    className="flex gap-4 border-l border-line-strong pl-4 text-sm leading-6 text-ink-soft"
+                  >
+                    <span className="font-bold text-primary">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    {decision}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="notes-heading"
+          className="border-b border-line py-8"
+        >
+          <div className="grid gap-6 lg:grid-cols-[15rem_1fr]">
+            <div>
+              <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-muted">
+                {t('sidebar.notesTitle')}
+              </p>
+              <h2
+                id="notes-heading"
+                className="mt-2 text-xl font-bold tracking-[-0.025em]"
+              >
+                {t('summary.notesSection')}
+              </h2>
+            </div>
+            {displayedNotes.length === 0 ? (
+              <p className="text-xs text-muted pl-4">
+                {t('summary.noNotes')}
+              </p>
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {displayedNotes.map((note, index) => (
+                  <li
+                    key={note.id || index}
+                    className="flex gap-4 border-l border-line-strong pl-4 text-sm leading-6 text-ink-soft"
+                  >
+                    {note.text}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </section>
 

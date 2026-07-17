@@ -152,6 +152,33 @@ const cloneGlossary = (): GlossaryTerm[] =>
   initialGlossary.map((term) => ({ ...term }))
 
 export const createInitialMeeting = (): Meeting => ({
+  id: '',
+  title: '',
+  participants: [
+    {
+      id: 'participant-vi',
+      name: '',
+      language: 'vi',
+    },
+    {
+      id: 'participant-en',
+      name: '',
+      language: 'en',
+    },
+  ],
+  conversationMode: 'auto',
+  microphoneId: microphoneOptions[0]?.id ?? 'built-in-microphone',
+  languageOrder: ['vi', 'en'],
+  glossary: [],
+  turns: [],
+  notes: [],
+  status: 'setup',
+  startedAt: null,
+  endedAt: null,
+  durationSeconds: 0,
+})
+
+export const createDemoMeeting = (): Meeting => ({
   id: 'meeting-demo',
   title: DEFAULT_MEETING_TITLE,
   participants: cloneParticipants(),
@@ -167,4 +194,4 @@ export const createInitialMeeting = (): Meeting => ({
   durationSeconds: 0,
 })
 
-export const mockMeeting: Meeting = createInitialMeeting()
+export const mockMeeting: Meeting = createDemoMeeting()

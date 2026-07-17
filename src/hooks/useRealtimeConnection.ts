@@ -41,7 +41,7 @@ export function useRealtimeConnection() {
         sessionId: roomId,
         clientId,
         domain: 'business',
-        languagePair: 'vi-en',
+        languagePair: `${languageOrder[0]}-${languageOrder[1]}`,
       },
       transports: ['websocket'],
       reconnection: false,

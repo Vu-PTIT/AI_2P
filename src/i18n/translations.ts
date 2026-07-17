@@ -84,6 +84,10 @@ const en = {
     'Keep it specific enough to recognize in the summary.',
   'details.vietnameseParticipant': 'Vietnamese participant',
   'details.englishParticipant': 'English participant',
+  'details.yourName': 'Your name',
+  'details.yourLanguage': 'Your language',
+  'details.vietnamese': 'Vietnamese',
+  'details.english': 'English',
   'details.required': '{{field}} is required.',
   'details.modeTitle': 'Conversation mode',
   'details.modeDescription':
@@ -261,6 +265,10 @@ const en = {
   'summary.emptyTitle': 'No conversation turns were recorded.',
   'summary.emptyDescription':
     'Start another meeting and speak to populate the transcript.',
+  'summary.noActionItems': 'No action items were recorded from notes. Add notes containing "todo" or "action" during the meeting to populate this.',
+  'summary.noDecisions': 'No decisions were recorded from notes. Add notes containing "decision" during the meeting to populate this.',
+  'summary.notesSection': 'Meeting notes',
+  'summary.noNotes': 'No notes were recorded during this meeting.',
   'summary.copySuccess': 'Summary copied to clipboard.',
   'summary.copyFailed': 'Summary could not be copied.',
   'transcript.title': 'ViEnMeet bilingual transcript',
@@ -358,6 +366,10 @@ const vi = {
     'Đặt tên đủ cụ thể để dễ nhận biết trong phần tổng kết.',
   'details.vietnameseParticipant': 'Người tham gia nói tiếng Việt',
   'details.englishParticipant': 'Người tham gia nói tiếng Anh',
+  'details.yourName': 'Tên của bạn',
+  'details.yourLanguage': 'Ngôn ngữ của bạn',
+  'details.vietnamese': 'Tiếng Việt',
+  'details.english': 'Tiếng Anh',
   'details.required': 'Vui lòng nhập {{field}}.',
   'details.modeTitle': 'Chế độ hội thoại',
   'details.modeDescription':
@@ -535,6 +547,10 @@ const vi = {
   'summary.emptyTitle': 'Không có lượt hội thoại nào được ghi lại.',
   'summary.emptyDescription':
     'Bắt đầu cuộc họp khác và nói để tạo biên bản hội thoại.',
+  'summary.noActionItems': 'Không có việc cần làm nào được ghi lại từ ghi chú. Hãy thêm ghi chú chứa từ "việc cần làm" hoặc "todo" trong cuộc họp.',
+  'summary.noDecisions': 'Không có quyết định nào được ghi lại từ ghi chú. Hãy thêm ghi chú chứa từ "quyết định" hoặc "decision" trong cuộc họp.',
+  'summary.notesSection': 'Ghi chú cuộc họp',
+  'summary.noNotes': 'Không có ghi chú nào được ghi lại trong cuộc họp này.',
   'summary.copySuccess': 'Đã sao chép phần tổng kết.',
   'summary.copyFailed': 'Không thể sao chép phần tổng kết.',
   'transcript.title': 'Biên bản song ngữ ViEnMeet',
