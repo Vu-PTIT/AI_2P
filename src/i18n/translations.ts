@@ -75,6 +75,9 @@ const en = {
   'setup.prototypeNote':
     'The system connects directly to the real-time translation server.',
   'setup.start': 'Start meeting',
+  'setup.join': 'Join meeting',
+  'details.joinTitle': 'Join active meeting',
+  'details.joinDescription': 'Confirm your name and language to enter the room.',
   'details.eyebrow': 'Meeting details',
   'details.title': 'Who is in the room?',
   'details.description':
@@ -357,6 +360,9 @@ const vi = {
   'setup.prototypeNote':
     'Hệ thống sẽ kết nối trực tiếp với máy chủ dịch thuật thời gian thực.',
   'setup.start': 'Bắt đầu cuộc họp',
+  'setup.join': 'Tham gia cuộc họp',
+  'details.joinTitle': 'Tham gia cuộc họp',
+  'details.joinDescription': 'Xác nhận tên và ngôn ngữ của bạn để vào phòng.',
   'details.eyebrow': 'Thông tin cuộc họp',
   'details.title': 'Ai đang có mặt?',
   'details.description':

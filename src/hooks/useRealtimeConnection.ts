@@ -42,6 +42,7 @@ export function useRealtimeConnection() {
         clientId,
         domain: 'business',
         languagePair: `${languageOrder[0]}-${languageOrder[1]}`,
+        title: meeting.title,
       },
       transports: ['websocket'],
       reconnection: false,

@@ -63,6 +63,12 @@ export default function LiveMeetingPage() {
   const activePushLanguage = usePushToTalk(meeting.conversationMode)
 
   useEffect(() => {
+    if (meeting.status !== 'live') {
+      navigate(ROUTES.setup(roomId))
+    }
+  }, [meeting.status, roomId, navigate])
+
+  useEffect(() => {
     if (meeting.status !== 'live' || realtimeStatus === 'mock') {
       return
     }

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
@@ -14,11 +15,42 @@ import { useTranslation } from '@/hooks/useTranslation'
 import { ROUTES } from '@/lib/constants'
 import { useMeetingStore } from '@/store/meetingStore'
 
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.NEXT_PUBLIC_API_URL ||
+  'https://api-hackathon.dangpham.id.vn'
+
 export default function MeetingSetupPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const roomId = useRoomSession()
   const startMeeting = useMeetingStore((state) => state.startMeeting)
+  const [isActiveSession, setIsActiveSession] = useState(false)
+  const [activeSessionTitle, setActiveSessionTitle] = useState('')
+
+  useEffect(() => {
+    if (!roomId) return
+
+    const checkSession = async () => {
+      try {
+        const res = await fetch(`${API_URL}/sessions/${roomId}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.exists) {
+            setIsActiveSession(true)
+            if (data.title) {
+              setActiveSessionTitle(data.title)
+              useMeetingStore.getState().setMeetingTitle(data.title)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error checking session status:', err)
+      }
+    }
+
+    checkSession()
+  }, [roomId])
 
   const handleStartMeeting = () => {
     startMeeting()
@@ -59,7 +91,7 @@ export default function MeetingSetupPage() {
         </div>
 
         <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(22rem,5fr)] lg:items-start xl:gap-14">
-          <MeetingDetailsForm onValidSubmit={handleStartMeeting} />
+          <MeetingDetailsForm onValidSubmit={handleStartMeeting} isActiveSession={isActiveSession} />
           <GlossaryEditor />
         </div>
 
@@ -78,7 +110,7 @@ export default function MeetingSetupPage() {
             }
             className="sm:w-auto"
           >
-            {t('setup.start')}
+            {isActiveSession ? t('setup.join') : t('setup.start')}
           </Button>
         </div>
       </main>
