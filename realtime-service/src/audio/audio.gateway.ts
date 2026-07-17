@@ -101,6 +101,7 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!sessionId) return;
     this.sessionStore.end(sessionId);
     this.server.to(sessionId).emit('session.ended');
+    this.aiBridge.closeSession(sessionId);
   }
 
   @OnEvent('ai.event')
