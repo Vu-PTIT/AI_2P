@@ -236,6 +236,23 @@ class FakeFptClient:
         self.audio = SimpleNamespace(transcriptions=self.transcriptions)
 
 
+class EmptyAudioProbeError(RuntimeError):
+    status_code = 500
+    body = {
+        "code": 500,
+        "subcode": 500000,
+        "description": "Invalid response from transcription service.",
+    }
+
+
+class GenericFptServerError(RuntimeError):
+    status_code = 500
+    body = {
+        "code": 500,
+        "description": "Model backend crashed.",
+    }
+
+
 class InstantQualityTranslator:
     def __init__(self, text="quality final"):
         self.text = text
@@ -561,6 +578,49 @@ def test_fpt_asr_uses_session_language_and_caches_probe():
 
     assert result.text == "hello"
     assert client.transcriptions.calls[-1]["language"] == "en"
+
+
+def test_fpt_asr_accepts_inconclusive_silent_readiness_probe():
+    with patch.dict(
+        os.environ,
+        {
+            "FPT_ASR": "true",
+            "FPT_API_KEY": "test-key",
+        },
+    ):
+        engine = ASREngine()
+        engine._fpt_client = FakeFptClient()
+        engine._transcribe_fpt = lambda *_args, **_kwargs: (
+            _ for _ in ()
+        ).throw(EmptyAudioProbeError("Error code: 500"))
+
+        with patch("asr.engine.LOGGER.warning") as warning:
+            assert engine.preflight().startswith("fpt:")
+            assert engine.preflight().startswith("fpt:")
+
+    warning.assert_called_once()
+
+
+def test_fpt_asr_rejects_unrelated_server_error_during_readiness():
+    with patch.dict(
+        os.environ,
+        {
+            "FPT_ASR": "true",
+            "FPT_API_KEY": "test-key",
+        },
+    ):
+        engine = ASREngine()
+        engine._fpt_client = FakeFptClient()
+        engine._transcribe_fpt = lambda *_args, **_kwargs: (
+            _ for _ in ()
+        ).throw(GenericFptServerError("Error code: 500"))
+
+        try:
+            engine.preflight()
+        except ModelUnavailableError as error:
+            assert "failed its readiness probe" in str(error)
+        else:
+            raise AssertionError("An unrelated FPT server error must fail readiness")
 
 
 def test_translation_preflights_probe_once():
@@ -994,6 +1054,8 @@ if __name__ == "__main__":
     test_worker_rejects_readiness_without_a_translation_path()
     test_fpt_asr_failure_does_not_fallback_to_local()
     test_fpt_asr_uses_session_language_and_caches_probe()
+    test_fpt_asr_accepts_inconclusive_silent_readiness_probe()
+    test_fpt_asr_rejects_unrelated_server_error_during_readiness()
     test_translation_preflights_probe_once()
     test_failed_translation_preflight_is_cached()
     test_audio_denoise_channel_diarization_and_overlap()

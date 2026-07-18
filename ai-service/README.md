@@ -77,6 +77,7 @@ python main.py --ingest-doc ./data/agenda.txt
 ## Environment
 
 ```bash
+# Use 0.0.0.0 instead when the gateway runs in another container/host.
 AI_WS_HOST=127.0.0.1
 AI_WS_PORT=8765
 
@@ -96,10 +97,11 @@ FPT_FAST_MT_MODEL=DeepSeek-V4-Flash
 FAST_MT_TIMEOUT=3.0
 FPT_ASR_PREFLIGHT_TIMEOUT=10
 
-FPT_AI_FACTORY_BASE_URL=https://your-fpt-ai-factory-endpoint/v1
-FPT_AI_FACTORY_API_KEY=replace-with-your-key
-FPT_AI_FACTORY_MODEL=your-fpt-model
-FPT_AI_FACTORY_TIMEOUT=1.0
+FPT_API_KEY=replace-with-your-key
+FPT_BASE_URL=https://mkp-api.fptcloud.com
+FPT_AI_FACTORY_BASE_URL=https://mkp-api.fptcloud.com
+FPT_AI_FACTORY_MODEL=SaoLa3.1-medium
+FPT_AI_FACTORY_TIMEOUT=3.0
 
 FPT_ASR=true
 FPT_ASR_MODEL=FPT.AI-whisper-large-v3-turbo
@@ -115,7 +117,8 @@ RAG_QDRANT_PATH=./data/qdrant_local
 RAG_COLLECTION=meeting_docs
 RAG_ALLOWED_ROOT=./data
 
-SESSION_EXPORT_DIR=./data/session_exports
+# Optional session export; leave disabled unless session IDs are sanitized.
+# SESSION_EXPORT_DIR=./data/session_exports
 OVERLAP_BUFFER_LIMIT=20
 ```
 

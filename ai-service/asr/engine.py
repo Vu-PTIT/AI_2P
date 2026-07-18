@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 import io
+import logging
 import os
 import threading
 from typing import List, Optional
@@ -10,6 +11,19 @@ import wave
 import numpy as np
 
 from model_errors import ModelUnavailableError
+
+
+LOGGER = logging.getLogger(__name__)
+EMPTY_AUDIO_PROBE_ERROR = "invalid response from transcription service"
+
+
+def _is_inconclusive_empty_audio_probe(error: Exception) -> bool:
+    """Recognize FPT's response when its ASR receives the silent probe WAV."""
+
+    status_code = getattr(error, "status_code", None)
+    body = getattr(error, "body", None)
+    details = f"{error} {body or ''}".casefold()
+    return status_code == 500 and EMPTY_AUDIO_PROBE_ERROR in details
 
 
 @dataclass
@@ -107,9 +121,18 @@ class ASREngine:
                         ),
                     )
                 except Exception as error:
-                    raise ModelUnavailableError(
-                        f"FPT ASR model '{model_name}' failed its readiness probe: {error}",
-                    ) from error
+                    if _is_inconclusive_empty_audio_probe(error):
+                        LOGGER.warning(
+                            "FPT ASR readiness endpoint was reached for model "
+                            "%s, but the silent probe contained no transcribable "
+                            "speech; accepting connectivity readiness.",
+                            model_name,
+                        )
+                    else:
+                        raise ModelUnavailableError(
+                            f"FPT ASR model '{model_name}' failed its readiness "
+                            f"probe: {error}",
+                        ) from error
                 self._preflight_result = f"fpt:{model_name}"
             else:
                 self._ensure_model()

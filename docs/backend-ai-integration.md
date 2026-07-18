@@ -23,6 +23,8 @@ flowchart LR
 Tạo `ai-service/.env` từ `.env.example`. Không commit file `.env`.
 
 ```env
+# Dùng 127.0.0.1 nếu AI và BE chạy trực tiếp trên cùng VPS.
+# Nếu chạy hai container riêng, dùng 0.0.0.0.
 AI_WS_HOST=127.0.0.1
 AI_WS_PORT=8765
 
@@ -34,8 +36,9 @@ FPT_API_KEY=replace-with-your-key
 FPT_ASR=true
 FPT_ASR_MODEL=FPT.AI-whisper-large-v3-turbo
 
+FPT_AI_FACTORY_BASE_URL=https://mkp-api.fptcloud.com
 FPT_AI_FACTORY_MODEL=SaoLa3.1-medium
-FPT_AI_FACTORY_TIMEOUT=1.0
+FPT_AI_FACTORY_TIMEOUT=3.0
 FPT_FAST_MT_MODEL=DeepSeek-V4-Flash
 FAST_MT_TIMEOUT=3.0
 FPT_ASR_PREFLIGHT_TIMEOUT=10
@@ -48,6 +51,10 @@ FPT_RERANKER_MODEL=bge-reranker-v2-m3
 
 `FPT_ASR=true` bắt buộc ASR đi qua FPT. Nếu FPT ASR lỗi, worker phát
 event lỗi thay vì âm thầm sử dụng Whisper local.
+
+Chỉ cần khai báo một `FPT_API_KEY`; các client ASR, translation, embedding và
+reranker đều dùng lại key này. Không cần lặp key ở
+`FPT_AI_FACTORY_API_KEY`.
 
 Quality translation dùng `FPT_AI_FACTORY_MODEL`. Khi quality path lỗi hoặc
 timeout, worker mới gọi tuần tự `FPT_FAST_MT_MODEL`; hai model không còn được
@@ -67,6 +74,10 @@ Trong container, thay `127.0.0.1` bằng hostname của container AI worker:
 ```env
 AI_WS_URL=ws://ai-service:8765/ws/session
 ```
+
+Đồng thời AI worker trong container phải bind `AI_WS_HOST=0.0.0.0`; nếu vẫn
+bind `127.0.0.1`, container backend sẽ không kết nối được và frontend nhận
+`AI_UNAVAILABLE`.
 
 ## 2. Khởi động
 
@@ -100,6 +111,11 @@ không được tự động bật. Chế độ này chỉ thay thế VAD; Whisp
 Torch, còn các đường ASR/dịch FPT từ xa vẫn có thể nhận audio. Lần preload
 Silero đầu tiên có thể tải model qua `torch.hub`; cần giữ cache Torch giữa các
 lần deploy.
+
+FPT ASR có thể trả `500 / Invalid response from transcription service` riêng
+cho WAV im lặng dùng trong readiness probe. Worker coi đúng phản hồi này là
+endpoint đã kết nối nhưng probe không có lời nói; các lỗi khác như sai key, sai
+model, timeout, rate limit hoặc lỗi server khác vẫn làm readiness thất bại.
 
 ## 3. Vòng đời kết nối
 
