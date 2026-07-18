@@ -3,6 +3,14 @@
 The NestJS bridge connects to this process through AI_WS_URL and forwards
 binary PCM16 audio chunks. This worker emits partial ASR, final ASR,
 translation deltas, translation finals, and error events.
+
+Streaming model (Google Meet / Speechmatics-style):
+- Endpointing is silence-driven (VAD-like RMS gate), not fixed-window.
+- Partial ASR is throttled by AUDIO_PARTIAL_INTERVAL_MS (default 800ms)
+  and only emitted when the transcript actually changes, so the caption
+  updates smoothly instead of appearing once per utterance.
+- ASR calls run in a worker thread so the WebSocket loop never blocks on
+  network / CPU work while more audio is arriving.
 """
 
 from __future__ import annotations
@@ -245,13 +253,27 @@ class PipelineSession:
         self.speaker = "vi"
         self.language_pair = "vi-en"
         self.ready = False
+
+        # --- Endpointing / streaming state ------------------------------------
         self.audio_buffer = bytearray()
-        self.partial_sent = False
         self.partial_segment = None
         self.last_revision = None
         self.speech_started = False
         self.speech_bytes = 0
         self.trailing_silence_bytes = 0
+
+        # Throttled partial state: emit a partial roughly every
+        # AUDIO_PARTIAL_INTERVAL_MS while the user is talking, and only if the
+        # ASR text actually changed. This is what makes captions look like
+        # Google Meet's live subtitles instead of a request/response ping-pong.
+        self.bytes_since_last_partial = 0
+        self.last_partial_text = ""
+        self.partial_in_flight = False
+
+        # --- Endpointing thresholds (all overridable via env) -----------------
+        # partial_bytes: how much *speech* audio must accumulate before we
+        #   run the first ASR pass for a new utterance. Guards against
+        #   transcribing 100ms of "uh".
         self.partial_bytes = audio_bytes_for_ms(
             bounded_env_float(
                 "AUDIO_ENDPOINT_PARTIAL_MS",
@@ -260,14 +282,27 @@ class PipelineSession:
                 5000,
             ),
         )
-        self.endpoint_silence_bytes = audio_bytes_for_ms(
+        # partial_interval_bytes: after the first partial, we re-run ASR at
+        #   most once every N ms of incoming audio. 800ms is a sensible
+        #   default given FPT ASR round-trip is ~300-600ms.
+        self.partial_interval_bytes = audio_bytes_for_ms(
             bounded_env_float(
-                "AUDIO_ENDPOINT_SILENCE_MS",
-                700,
+                "AUDIO_PARTIAL_INTERVAL_MS",
+                800,
                 300,
                 3000,
             ),
         )
+        # endpoint_silence_bytes: silence duration that triggers a final.
+        self.endpoint_silence_bytes = audio_bytes_for_ms(
+            bounded_env_float(
+                "AUDIO_ENDPOINT_SILENCE_MS",
+                900,
+                300,
+                3000,
+            ),
+        )
+        # minimum_speech_bytes: below this, we discard as noise/cough.
         self.minimum_speech_bytes = audio_bytes_for_ms(
             bounded_env_float(
                 "AUDIO_ENDPOINT_MIN_SPEECH_MS",
@@ -276,6 +311,7 @@ class PipelineSession:
                 2000,
             ),
         )
+        # max_utterance_bytes: safety cap so we don't hoard 60s of audio.
         self.max_utterance_bytes = audio_bytes_for_ms(
             bounded_env_float(
                 "AUDIO_ENDPOINT_MAX_MS",
@@ -284,6 +320,8 @@ class PipelineSession:
                 30000,
             ),
         )
+        # pre_roll_bytes: keep the tail of silence around so the start of a
+        #   word isn't clipped when speech begins.
         self.pre_roll_bytes = audio_bytes_for_ms(
             bounded_env_float(
                 "AUDIO_ENDPOINT_PREROLL_MS",
@@ -294,10 +332,11 @@ class PipelineSession:
         )
         self.endpoint_rms_threshold = bounded_env_float(
             "AUDIO_ENDPOINT_RMS",
-            0.008,
+            0.02,
             0.0005,
             0.2,
         )
+
         self.overlap_buffer: list[dict[str, Any]] = []
         self.overlap_buffer_limit = int(os.getenv("OVERLAP_BUFFER_LIMIT", "20"))
         self._last_status_key = None
@@ -458,6 +497,8 @@ class PipelineSession:
         self.audio_buffer.extend(payload)
         if not self.speech_started:
             if not chunk_has_speech:
+                # Still silent -- keep only enough tail to serve as pre-roll
+                # when speech eventually starts, so we don't clip word onsets.
                 self._trim_to_pre_roll()
                 return
             self.speech_started = True
@@ -467,6 +508,11 @@ class PipelineSession:
             self.trailing_silence_bytes = 0
         else:
             self.trailing_silence_bytes += len(payload)
+
+        # Bytes-since-last-partial counts *all* incoming audio, not just
+        # speech. This way a short mid-sentence pause doesn't push the next
+        # partial arbitrarily far into the future.
+        self.bytes_since_last_partial += len(payload)
 
         utterance_id = self._utterance_id()
         reached_silence = (
@@ -485,10 +531,19 @@ class PipelineSession:
             await self.finalize_utterance(utterance_id)
             return
 
+        # Throttled streaming partials, Google Meet style. We only run ASR
+        # again when:
+        #   - enough total speech has arrived to be worth transcribing, AND
+        #   - at least AUDIO_PARTIAL_INTERVAL_MS of audio has arrived since
+        #     the last partial, AND
+        #   - no other partial is currently mid-flight (prevents piling up
+        #     ASR calls when the API is slow).
         if (
-            not self.partial_sent
+            not self.partial_in_flight
             and self.speech_bytes >= self.partial_bytes
+            and self.bytes_since_last_partial >= self.partial_interval_bytes
         ):
+            self.bytes_since_last_partial = 0
             await self.emit_partial(utterance_id)
 
     async def flush_pending_utterance(self) -> None:
@@ -526,19 +581,24 @@ class PipelineSession:
 
     def _discard_pending_audio(self) -> None:
         self.audio_buffer.clear()
-        self.partial_sent = False
         self.partial_segment = None
         self.last_revision = None
         self.speech_started = False
         self.speech_bytes = 0
         self.trailing_silence_bytes = 0
+        self.bytes_since_last_partial = 0
+        self.last_partial_text = ""
+        self.partial_in_flight = False
 
     def _reset_endpoint_state(self) -> None:
         self.audio_buffer.clear()
-        self.partial_sent = False
+        self.partial_segment = None
         self.speech_started = False
         self.speech_bytes = 0
         self.trailing_silence_bytes = 0
+        self.bytes_since_last_partial = 0
+        self.last_partial_text = ""
+        self.partial_in_flight = False
 
     def _preflight_session(self) -> tuple[dict[str, str | None], list[str]]:
         def log_optional_error(capability: str, error: Exception) -> None:
@@ -559,15 +619,37 @@ class PipelineSession:
             on_optional_error=log_optional_error,
         )
 
+    async def _transcribe_async(self, raw: bytes, utterance_id: str):
+        """Run the sync ASR/VAD pipeline in a worker thread.
+
+        This is what keeps the WebSocket loop responsive: while FPT ASR is
+        making its ~300-600ms round trip, we can still receive the next
+        binary chunk from the client instead of stalling.
+        """
+
+        return await asyncio.to_thread(self._transcribe, raw, utterance_id)
+
     async def emit_partial(self, utterance_id: str) -> None:
+        # Snapshot the buffer up-front so the ASR call sees a stable copy
+        # even if more audio arrives while the worker thread is busy.
+        snapshot = bytes(self.audio_buffer)
+        self.partial_in_flight = True
         try:
-            asr_segment = self._transcribe(bytes(self.audio_buffer), utterance_id)
+            asr_segment = await self._transcribe_async(snapshot, utterance_id)
             if not asr_segment or not asr_segment.text:
                 return
+
+            # De-dup: if the transcript hasn't actually changed since the
+            # last partial we sent, skip. This is why partials feel like a
+            # smooth caption stream instead of visual flicker.
+            if asr_segment.text == self.last_partial_text:
+                return
+
             asr_segment.is_final = False
             asr_segment.stability_score = min(asr_segment.stability_score, 0.6)
             self.partial_segment = asr_segment
-            self.partial_sent = True
+            self.last_partial_text = asr_segment.text
+
             await self.ws.send_json(
                 {
                     "type": "stt.partial",
@@ -579,8 +661,15 @@ class PipelineSession:
                     "utteranceId": utterance_id,
                 },
             )
-        except Exception:
-            return
+        except Exception as error:
+            LOGGER.debug(
+                "Partial ASR failed for session=%s client=%s: %s",
+                self.session_id,
+                self.client_id,
+                error,
+            )
+        finally:
+            self.partial_in_flight = False
 
     async def finalize_utterance(self, utterance_id: str) -> None:
         raw = bytes(self.audio_buffer)
@@ -588,7 +677,7 @@ class PipelineSession:
         self.utterance_count += 1
 
         try:
-            asr_segment = self._transcribe(raw, utterance_id)
+            asr_segment = await self._transcribe_async(raw, utterance_id)
             if not asr_segment or not asr_segment.text:
                 self.partial_segment = None
                 self.last_revision = None
