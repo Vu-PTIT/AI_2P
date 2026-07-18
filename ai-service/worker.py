@@ -70,7 +70,11 @@ def get_shared_asr_engine() -> ASREngine:
     global _SHARED_ASR_ENGINE
     if _SHARED_ASR_ENGINE is None:
         _SHARED_ASR_ENGINE = ASREngine()
-        _SHARED_ASR_ENGINE._ensure_model()  # ep load Whisper ngay, chi 1 lan
+        # FIX: chi ep load Whisper local neu KHONG dung FPT ASR. Truoc day
+        # goi _ensure_model() vo dieu kien, bo qua FPT_ASR=true trong .env,
+        # khien Whisper large-v3 (~2.9GB) van bi tai ve va load vao RAM.
+        if not getattr(_SHARED_ASR_ENGINE, "_use_fpt_asr", False):
+            _SHARED_ASR_ENGINE._ensure_model()
     return _SHARED_ASR_ENGINE
 
 
@@ -78,7 +82,10 @@ def get_shared_fast_translator() -> FastPathTranslator:
     global _SHARED_FAST_TRANSLATOR
     if _SHARED_FAST_TRANSLATOR is None:
         _SHARED_FAST_TRANSLATOR = FastPathTranslator()
-        _SHARED_FAST_TRANSLATOR._ensure_model()  # ep load NLLB ngay, chi 1 lan
+        # FIX: FastPathTranslator ban moi goi FPT API (khong load NLLB cuc
+        # bo nua), nen chi can preflight() de khoi tao client HTTP nhe,
+        # khong con _ensure_model() (ham nay khong ton tai trong ban moi).
+        _SHARED_FAST_TRANSLATOR.preflight()
     return _SHARED_FAST_TRANSLATOR
 # -----------------------------------------------------------------------------
 
@@ -857,14 +864,16 @@ async def run_server(host: str | None = None, port: int | None = None) -> None:
     host = host or os.getenv("AI_WS_HOST", "127.0.0.1")
     port = port or int(os.getenv("AI_WS_PORT", "8765"))
 
-    # FIX: "warm up" tat ca model nang (VAD, Whisper ASR, NLLB fast-translate)
-    # NGAY luc server khoi dong, TRUOC khi mo cong nhan client. Nho vay client
-    # dau tien connect vao khong con phai doi load model nua.
-    print("Warming up shared models (VAD, Whisper ASR, NLLB fast-translate)...")
+    # FIX: "warm up" cac shared instance NGAY luc server khoi dong, TRUOC khi
+    # mo cong nhan client, de client dau tien khong phai doi load. Voi cau
+    # hinh FPT_ASR=true, get_shared_asr_engine() se KHONG tai Whisper local
+    # nua; get_shared_fast_translator() chi khoi tao 1 HTTP client toi FPT
+    # API (khong con NLLB local), nen buoc warm-up nay rat nhanh va nhe RAM.
+    print("Warming up shared resources (VAD; ASR/translate via FPT API when configured)...")
     await asyncio.to_thread(get_shared_audio_pipeline)
     await asyncio.to_thread(get_shared_asr_engine)
     await asyncio.to_thread(get_shared_fast_translator)
-    print("All shared models ready.")
+    print("All shared resources ready.")
 
     server = await asyncio.start_server(handle_client, host, port)
     sockets = ", ".join(str(socket.getsockname()) for socket in server.sockets or [])
