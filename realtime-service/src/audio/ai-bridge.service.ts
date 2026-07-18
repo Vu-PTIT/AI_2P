@@ -25,6 +25,7 @@ type AiPipeline = {
 const SUPPORTED_AI_EVENTS = new Set<AiWorkerEvent['type']>([
   'stt.partial',
   'stt.final',
+  'translate.partial',
   'translate.token',
   'translate.done',
   'error',

@@ -2,13 +2,21 @@
 
 The NestJS bridge connects to this process through AI_WS_URL and forwards
 binary PCM16 audio chunks. This worker emits partial ASR, final ASR,
-translation deltas, translation finals, and error events.
+partial translation, streaming translation deltas, translation finals,
+and error events.
 
 Streaming model (Google Meet / Speechmatics-style):
 - Endpointing is silence-driven (VAD-like RMS gate), not fixed-window.
-- Partial ASR is throttled by AUDIO_PARTIAL_INTERVAL_MS (default 800ms)
+- Partial ASR is throttled by AUDIO_PARTIAL_INTERVAL_MS (default 600ms)
   and only emitted when the transcript actually changes, so the caption
   updates smoothly instead of appearing once per utterance.
+- Partial ASR ALSO triggers a background partial translation using the
+  fast path. Its output is emitted as `translate.partial` (full text,
+  meant to REPLACE any prior partial on the UI). This is what makes the
+  translated caption appear while the user is still talking.
+- When silence endpoints the utterance, any in-flight partial translate
+  is cancelled and the final translation runs. Its `translate.done` event
+  arrives strictly after the last `translate.partial` and locks the line.
 - ASR calls run in a worker thread so the WebSocket loop never blocks on
   network / CPU work while more audio is arriving.
 """
@@ -72,9 +80,14 @@ def bounded_env_float(
     return min(maximum, max(minimum, value))
 
 
+def env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().casefold() in ("1", "true", "yes", "on")
+
+
 # Shared model/API instances are warmed once before the worker starts listening.
-# The translators are stateless per request, so sharing them also lets their
-# successful external readiness probes be reused by every meeting session.
 _SHARED_AUDIO_PIPELINE: AudioPipeline | None = None
 _SHARED_ASR_ENGINE: ASREngine | None = None
 _SHARED_FAST_TRANSLATOR: FastPathTranslator | None = None
@@ -236,6 +249,10 @@ class WebSocketConnection:
         else:
             header.extend((127, *struct.pack("!Q", length)))
 
+        # Single atomic write keeps concurrent frames from interleaving in
+        # the socket buffer. StreamWriter.write() is sync; asyncio only
+        # yields on drain(), by which point our whole frame is already
+        # in the buffer as one contiguous chunk.
         self.writer.write(bytes(header) + payload)
         await self.writer.drain()
 
@@ -262,79 +279,53 @@ class PipelineSession:
         self.speech_bytes = 0
         self.trailing_silence_bytes = 0
 
-        # Throttled partial state: emit a partial roughly every
-        # AUDIO_PARTIAL_INTERVAL_MS while the user is talking, and only if the
-        # ASR text actually changed. This is what makes captions look like
-        # Google Meet's live subtitles instead of a request/response ping-pong.
+        # Throttled partial-ASR state.
         self.bytes_since_last_partial = 0
         self.last_partial_text = ""
         self.partial_in_flight = False
 
+        # Partial-translate state. A background asyncio.Task translates the
+        # most recent ASR partial via the fast path and emits `translate.partial`.
+        # When a newer partial arrives we cancel the old task before starting a
+        # new one, so only one partial-translate is ever in flight per client.
+        self.partial_translate_task: asyncio.Task | None = None
+        self.partial_translate_utterance_id: str | None = None
+        self.last_translated_partial_text = ""
+
         # --- Endpointing thresholds (all overridable via env) -----------------
-        # partial_bytes: how much *speech* audio must accumulate before we
-        #   run the first ASR pass for a new utterance. Guards against
-        #   transcribing 100ms of "uh".
         self.partial_bytes = audio_bytes_for_ms(
-            bounded_env_float(
-                "AUDIO_ENDPOINT_PARTIAL_MS",
-                1000,
-                500,
-                5000,
-            ),
+            bounded_env_float("AUDIO_ENDPOINT_PARTIAL_MS", 1000, 500, 5000),
         )
-        # partial_interval_bytes: after the first partial, we re-run ASR at
-        #   most once every N ms of incoming audio. 800ms is a sensible
-        #   default given FPT ASR round-trip is ~300-600ms.
         self.partial_interval_bytes = audio_bytes_for_ms(
-            bounded_env_float(
-                "AUDIO_PARTIAL_INTERVAL_MS",
-                800,
-                300,
-                3000,
-            ),
+            bounded_env_float("AUDIO_PARTIAL_INTERVAL_MS", 600, 300, 3000),
         )
-        # endpoint_silence_bytes: silence duration that triggers a final.
         self.endpoint_silence_bytes = audio_bytes_for_ms(
-            bounded_env_float(
-                "AUDIO_ENDPOINT_SILENCE_MS",
-                900,
-                300,
-                3000,
-            ),
+            bounded_env_float("AUDIO_ENDPOINT_SILENCE_MS", 1100, 300, 3000),
         )
-        # minimum_speech_bytes: below this, we discard as noise/cough.
         self.minimum_speech_bytes = audio_bytes_for_ms(
-            bounded_env_float(
-                "AUDIO_ENDPOINT_MIN_SPEECH_MS",
-                200,
-                100,
-                2000,
-            ),
+            bounded_env_float("AUDIO_ENDPOINT_MIN_SPEECH_MS", 200, 100, 2000),
         )
-        # max_utterance_bytes: safety cap so we don't hoard 60s of audio.
         self.max_utterance_bytes = audio_bytes_for_ms(
-            bounded_env_float(
-                "AUDIO_ENDPOINT_MAX_MS",
-                15000,
-                3000,
-                30000,
-            ),
+            bounded_env_float("AUDIO_ENDPOINT_MAX_MS", 15000, 3000, 30000),
         )
-        # pre_roll_bytes: keep the tail of silence around so the start of a
-        #   word isn't clipped when speech begins.
         self.pre_roll_bytes = audio_bytes_for_ms(
-            bounded_env_float(
-                "AUDIO_ENDPOINT_PREROLL_MS",
-                300,
-                0,
-                1000,
-            ),
+            bounded_env_float("AUDIO_ENDPOINT_PREROLL_MS", 300, 0, 1000),
         )
         self.endpoint_rms_threshold = bounded_env_float(
-            "AUDIO_ENDPOINT_RMS",
-            0.02,
-            0.0005,
-            0.2,
+            "AUDIO_ENDPOINT_RMS", 0.015, 0.0005, 0.2,
+        )
+
+        # --- Partial-translate tuning ----------------------------------------
+        self.partial_translate_enabled = env_bool("PARTIAL_TRANSLATE_ENABLED", True)
+        # Only translate partials once they have this many words. Prevents
+        # translating "hôm" → "today" which will immediately be replaced.
+        self.partial_translate_min_words = int(
+            bounded_env_float("PARTIAL_TRANSLATE_MIN_WORDS", 3, 1, 50),
+        )
+        # Debounce: don't translate a new partial if it only adds this many
+        # words or fewer over the last one we translated. Keeps FPT bill down.
+        self.partial_translate_min_delta_words = int(
+            bounded_env_float("PARTIAL_TRANSLATE_MIN_DELTA_WORDS", 2, 1, 20),
         )
 
         self.overlap_buffer: list[dict[str, Any]] = []
@@ -347,7 +338,6 @@ class PipelineSession:
         self.quality_available = True
 
         # Shared resources are preflighted before the server opens its port.
-        # Their preflight methods are cached for direct/injected test servers.
         self.audio = get_shared_audio_pipeline()
         self.asr = get_shared_asr_engine()
         self.revision = RevisionHandler()
@@ -361,13 +351,18 @@ class PipelineSession:
         self._load_static_data()
 
     async def run(self) -> None:
-        while True:
-            kind, payload = await self.ws.receive()
-            if kind == "text":
-                if not await self.handle_control(str(payload)):
-                    return
-            else:
-                await self.handle_audio(bytes(payload))
+        try:
+            while True:
+                kind, payload = await self.ws.receive()
+                if kind == "text":
+                    if not await self.handle_control(str(payload)):
+                        return
+                else:
+                    await self.handle_audio(bytes(payload))
+        finally:
+            # Belt-and-braces: if the connection dies while a partial translate
+            # is still running, don't leave the task dangling.
+            await self._cancel_partial_translate()
 
     async def handle_control(self, payload: str) -> bool:
         try:
@@ -398,7 +393,7 @@ class PipelineSession:
 
         if message_type == "session.init":
             self.ready = False
-            self._discard_pending_audio()
+            await self._discard_pending_utterance()
             config = message.get("config") if isinstance(message.get("config"), dict) else {}
             self.language_pair = str(config.get("languagePair") or self.language_pair)
             configured_speaker = config.get("speaker")
@@ -412,16 +407,12 @@ class PipelineSession:
                     )
             self._ingest_documents(config.get("documents", []))
             try:
-                capabilities, warnings = await asyncio.to_thread(
-                    self._preflight_session,
-                )
+                capabilities, warnings = await asyncio.to_thread(self._preflight_session)
             except Exception as error:
                 self.ready = False
                 LOGGER.error(
                     "Readiness failed for session=%s client=%s: %s",
-                    self.session_id,
-                    self.client_id,
-                    error,
+                    self.session_id, self.client_id, error,
                 )
                 await self.ws.send_json(
                     {
@@ -434,9 +425,7 @@ class PipelineSession:
                 return True
 
             self.fast_available = capabilities["fastTranslation"] is not None
-            self.quality_available = (
-                capabilities["qualityTranslation"] is not None
-            )
+            self.quality_available = capabilities["qualityTranslation"] is not None
             self.ready = True
             await self.send_health_status(force=True)
             await self.ws.send_json(
@@ -448,6 +437,7 @@ class PipelineSession:
                     "capabilities": capabilities,
                     "warnings": warnings,
                     "externalApisProbed": external_apis_probed(capabilities),
+                    "partialTranslateEnabled": self.partial_translate_enabled,
                 },
             )
             return True
@@ -463,19 +453,10 @@ class PipelineSession:
             count = self._ingest_documents(paths)
             if count == 0:
                 await self.ws.send_json(
-                    {
-                        "type": "error",
-                        "code": "RAG_INGEST_EMPTY",
-                        "message": "No documents ingested.",
-                    },
+                    {"type": "error", "code": "RAG_INGEST_EMPTY", "message": "No documents ingested."},
                 )
             else:
-                await self.ws.send_json(
-                    {
-                        "type": "rag.ingested",
-                        "chunks": count,
-                    },
-                )
+                await self.ws.send_json({"type": "rag.ingested", "chunks": count})
             return True
 
         return True
@@ -483,11 +464,7 @@ class PipelineSession:
     async def handle_audio(self, payload: bytes) -> None:
         if not self.ready:
             await self.ws.send_json(
-                {
-                    "type": "error",
-                    "code": "AI_NOT_READY",
-                    "message": "The AI session is not ready for audio.",
-                },
+                {"type": "error", "code": "AI_NOT_READY", "message": "The AI session is not ready for audio."},
             )
             return
 
@@ -497,8 +474,6 @@ class PipelineSession:
         self.audio_buffer.extend(payload)
         if not self.speech_started:
             if not chunk_has_speech:
-                # Still silent -- keep only enough tail to serve as pre-roll
-                # when speech eventually starts, so we don't clip word onsets.
                 self._trim_to_pre_roll()
                 return
             self.speech_started = True
@@ -509,35 +484,23 @@ class PipelineSession:
         else:
             self.trailing_silence_bytes += len(payload)
 
-        # Bytes-since-last-partial counts *all* incoming audio, not just
-        # speech. This way a short mid-sentence pause doesn't push the next
-        # partial arbitrarily far into the future.
         self.bytes_since_last_partial += len(payload)
 
         utterance_id = self._utterance_id()
-        reached_silence = (
-            self.trailing_silence_bytes >= self.endpoint_silence_bytes
-        )
+        reached_silence = self.trailing_silence_bytes >= self.endpoint_silence_bytes
         reached_maximum = len(self.audio_buffer) >= self.max_utterance_bytes
 
         if reached_silence:
             if self.speech_bytes >= self.minimum_speech_bytes:
                 await self.finalize_utterance(utterance_id)
             else:
-                self._discard_pending_audio()
+                await self._discard_pending_utterance()
             return
 
         if reached_maximum:
             await self.finalize_utterance(utterance_id)
             return
 
-        # Throttled streaming partials, Google Meet style. We only run ASR
-        # again when:
-        #   - enough total speech has arrived to be worth transcribing, AND
-        #   - at least AUDIO_PARTIAL_INTERVAL_MS of audio has arrived since
-        #     the last partial, AND
-        #   - no other partial is currently mid-flight (prevents piling up
-        #     ASR calls when the API is slow).
         if (
             not self.partial_in_flight
             and self.speech_bytes >= self.partial_bytes
@@ -554,17 +517,14 @@ class PipelineSession:
         ):
             await self.finalize_utterance(self._utterance_id())
         else:
-            self._discard_pending_audio()
+            await self._discard_pending_utterance()
 
     def _chunk_has_speech(self, payload: bytes) -> bool:
         usable_length = len(payload) - (len(payload) % BYTES_PER_SAMPLE)
         if usable_length <= 0:
             return False
 
-        samples = np.frombuffer(
-            payload[:usable_length],
-            dtype=np.int16,
-        ).astype(np.float32)
+        samples = np.frombuffer(payload[:usable_length], dtype=np.int16).astype(np.float32)
         if samples.size == 0:
             return False
 
@@ -579,59 +539,43 @@ class PipelineSession:
         if len(self.audio_buffer) > self.pre_roll_bytes:
             del self.audio_buffer[:-self.pre_roll_bytes]
 
-    def _discard_pending_audio(self) -> None:
+    def _reset_endpoint_state(self) -> None:
+        """Reset endpointing / partial-ASR state. Does NOT touch the
+        partial-translate task — the caller is responsible for cancelling
+        that with await, so ordering (partial before done) is preserved.
+        """
         self.audio_buffer.clear()
         self.partial_segment = None
-        self.last_revision = None
         self.speech_started = False
         self.speech_bytes = 0
         self.trailing_silence_bytes = 0
         self.bytes_since_last_partial = 0
         self.last_partial_text = ""
+        self.last_translated_partial_text = ""
         self.partial_in_flight = False
 
-    def _reset_endpoint_state(self) -> None:
-        self.audio_buffer.clear()
-        self.partial_segment = None
-        self.speech_started = False
-        self.speech_bytes = 0
-        self.trailing_silence_bytes = 0
-        self.bytes_since_last_partial = 0
-        self.last_partial_text = ""
-        self.partial_in_flight = False
+    async def _discard_pending_utterance(self) -> None:
+        """Drop the current utterance's audio AND cancel any partial translate."""
+        self._reset_endpoint_state()
+        self.last_revision = None
+        await self._cancel_partial_translate()
 
     def _preflight_session(self) -> tuple[dict[str, str | None], list[str]]:
         def log_optional_error(capability: str, error: Exception) -> None:
             LOGGER.warning(
-                "Optional capability unavailable for session=%s "
-                "client=%s capability=%s: %s",
-                self.session_id,
-                self.client_id,
-                capability,
-                error,
+                "Optional capability unavailable for session=%s client=%s capability=%s: %s",
+                self.session_id, self.client_id, capability, error,
             )
 
         return preflight_runtime(
-            audio=self.audio,
-            asr=self.asr,
-            fast=self.fast,
-            quality=self.quality,
+            audio=self.audio, asr=self.asr, fast=self.fast, quality=self.quality,
             on_optional_error=log_optional_error,
         )
 
     async def _transcribe_async(self, raw: bytes, utterance_id: str):
-        """Run the sync ASR/VAD pipeline in a worker thread.
-
-        This is what keeps the WebSocket loop responsive: while FPT ASR is
-        making its ~300-600ms round trip, we can still receive the next
-        binary chunk from the client instead of stalling.
-        """
-
         return await asyncio.to_thread(self._transcribe, raw, utterance_id)
 
     async def emit_partial(self, utterance_id: str) -> None:
-        # Snapshot the buffer up-front so the ASR call sees a stable copy
-        # even if more audio arrives while the worker thread is busy.
         snapshot = bytes(self.audio_buffer)
         self.partial_in_flight = True
         try:
@@ -639,9 +583,6 @@ class PipelineSession:
             if not asr_segment or not asr_segment.text:
                 return
 
-            # De-dup: if the transcript hasn't actually changed since the
-            # last partial we sent, skip. This is why partials feel like a
-            # smooth caption stream instead of visual flicker.
             if asr_segment.text == self.last_partial_text:
                 return
 
@@ -661,19 +602,151 @@ class PipelineSession:
                     "utteranceId": utterance_id,
                 },
             )
+
+            # Kick off (or replace) the partial-translate task for this
+            # utterance. Fire-and-forget: we don't await the task here.
+            self._schedule_partial_translate(asr_segment.text, utterance_id)
         except Exception as error:
             LOGGER.debug(
                 "Partial ASR failed for session=%s client=%s: %s",
-                self.session_id,
-                self.client_id,
-                error,
+                self.session_id, self.client_id, error,
             )
         finally:
             self.partial_in_flight = False
 
+    # ------------------------------------------------------------------
+    # Partial translate (Google Meet-style incremental translation)
+    # ------------------------------------------------------------------
+
+    def _schedule_partial_translate(self, source_text: str, utterance_id: str) -> None:
+        """Decide whether to kick off a fresh partial-translate task.
+
+        Cancels the previous task if it's still running. Called synchronously
+        from emit_partial after the stt.partial has been sent.
+        """
+
+        if not self.partial_translate_enabled or not self.fast_available:
+            return
+
+        text = source_text.strip()
+        if not text:
+            return
+
+        words = text.split()
+        if len(words) < self.partial_translate_min_words:
+            return
+
+        # Debounce: only translate again if the partial has grown by at
+        # least `min_delta_words` words compared to what we last shipped.
+        previous_words = self.last_translated_partial_text.split()
+        if len(words) - len(previous_words) < self.partial_translate_min_delta_words:
+            return
+
+        # Cancel the in-flight task synchronously (no await). It will observe
+        # the cancellation on its next event-loop yield. If it happens to be
+        # about to emit an event, our utterance_id / text guards below will
+        # keep the UI consistent.
+        if self.partial_translate_task is not None and not self.partial_translate_task.done():
+            self.partial_translate_task.cancel()
+
+        self.partial_translate_utterance_id = utterance_id
+        self.last_translated_partial_text = text
+        self.partial_translate_task = asyncio.create_task(
+            self._translate_partial_task(text, utterance_id),
+            name=f"partial-translate:{utterance_id}",
+        )
+
+    async def _translate_partial_task(self, source_text: str, utterance_id: str) -> None:
+        """Translate a partial via fast path and emit translate.partial.
+
+        Best-effort: any failure is logged silently. Does NOT touch the
+        HealthMonitor — a partial translation failing means very little,
+        and we don't want it to escalate the fallback level and hurt the
+        eventual final translation.
+
+        Ordering guarantee: the caller (finalize_utterance) must
+        `await self._cancel_partial_translate()` before running the final
+        translation. That await ensures this task has either completed its
+        send_json or exited via CancelledError before translate.token /
+        translate.done frames start going out.
+        """
+
+        source_lang, target_lang = self._language_pair()
+        stream = self.fast.stream_translate(source_text, source_lang, target_lang)
+        chunks: list[str] = []
+
+        try:
+            while True:
+                done, delta = await asyncio.to_thread(next_translation_delta, stream)
+                if done:
+                    break
+                if delta:
+                    chunks.append(delta)
+
+            translated = "".join(chunks).strip()
+            if not translated:
+                return
+
+            # Guard: if the utterance has advanced (new partial superseded us,
+            # or a final has already fired), don't emit — we'd be pushing
+            # stale content that would flash on the UI.
+            if self.partial_translate_utterance_id != utterance_id:
+                return
+
+            await self.ws.send_json(
+                {
+                    "type": "translate.partial",
+                    "text": translated,
+                    "sourceText": source_text,
+                    "speaker": self.speaker,
+                    "utteranceId": utterance_id,
+                },
+            )
+        except asyncio.CancelledError:
+            # A newer partial arrived, or we're finalizing. Just bail.
+            raise
+        except Exception as error:
+            LOGGER.debug(
+                "Partial translate failed for utterance=%s: %s",
+                utterance_id, error,
+            )
+        finally:
+            close = getattr(stream, "close", None)
+            if callable(close):
+                try:
+                    await asyncio.to_thread(close)
+                except Exception:
+                    pass
+
+    async def _cancel_partial_translate(self) -> None:
+        """Cancel and await the in-flight partial-translate task, if any."""
+
+        task = self.partial_translate_task
+        self.partial_translate_task = None
+        self.partial_translate_utterance_id = None
+        if task is None:
+            return
+        if not task.done():
+            task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    # ------------------------------------------------------------------
+    # Finalization
+    # ------------------------------------------------------------------
+
     async def finalize_utterance(self, utterance_id: str) -> None:
         raw = bytes(self.audio_buffer)
         self._reset_endpoint_state()
+
+        # CRITICAL: wait for any partial translate to fully unwind BEFORE
+        # sending stt.final or starting the final translate. This is how
+        # we guarantee translate.done always arrives after the last
+        # translate.partial for this utterance.
+        await self._cancel_partial_translate()
+
         self.utterance_count += 1
 
         try:
@@ -803,12 +876,11 @@ class PipelineSession:
             or self.monitor.get_level() >= FallbackLevel.FAST_PATH_ONLY
         ):
             return await self.translate_fast_only(
-                source_text,
-                utterance_id,
-                source_lang,
-                target_lang,
+                source_text, utterance_id, source_lang, target_lang,
             )
 
+        # RAG is intentionally skipped in the realtime path. RAG still runs
+        # at session.close to build meeting minutes.
         context = QualityContext(
             asr_text=source_text,
             source_lang=source_lang,
@@ -816,17 +888,13 @@ class PipelineSession:
             sliding_window=[entry.source_text for entry in self.session.window.get_context()],
             glossary=self.glossary.get_all(),
             acronym_table=self.acronym.get_all(),
-            rag_chunks=self._rag_chunks(source_text),
+            rag_chunks=[],
         )
         quality_text, stream_error = await self.forward_translation_stream(
-            self.quality.stream_translate(context),
-            utterance_id,
+            self.quality.stream_translate(context), utterance_id,
         )
         if stream_error is None:
-            final_text = self._annotate_acronyms(
-                quality_text.strip(),
-                source_text,
-            )
+            final_text = self._annotate_acronyms(quality_text.strip(), source_text)
             await self.send_translation_done(utterance_id, source_text, final_text)
             self.monitor.report_success()
             await self.send_health_status()
@@ -837,10 +905,7 @@ class PipelineSession:
         if level == FallbackLevel.REDUCE_CONTEXT:
             self.session.window.resize(3)
         return await self.translate_fast_only(
-            source_text,
-            utterance_id,
-            source_lang,
-            target_lang,
+            source_text, utterance_id, source_lang, target_lang,
             reset_draft=bool(quality_text),
         )
 
@@ -856,19 +921,12 @@ class PipelineSession:
             return await self.send_raw_transcript(utterance_id, source_text)
 
         fast_text, stream_error = await self.forward_translation_stream(
-            self.fast.stream_translate(
-                source_text,
-                source_lang,
-                target_lang,
-            ),
+            self.fast.stream_translate(source_text, source_lang, target_lang),
             utterance_id,
             reset_first_delta=reset_draft,
         )
         if stream_error is None:
-            final_text = self._annotate_acronyms(
-                fast_text.strip(),
-                source_text,
-            )
+            final_text = self._annotate_acronyms(fast_text.strip(), source_text)
             await self.send_translation_done(utterance_id, source_text, final_text)
             return final_text
 
@@ -886,10 +944,7 @@ class PipelineSession:
         first_delta = True
         try:
             while True:
-                done, delta = await asyncio.to_thread(
-                    next_translation_delta,
-                    stream,
-                )
+                done, delta = await asyncio.to_thread(next_translation_delta, stream)
                 if done:
                     break
                 if not delta:
@@ -897,9 +952,7 @@ class PipelineSession:
 
                 chunks.append(delta)
                 await self.send_translation_token(
-                    utterance_id,
-                    delta,
-                    reset=reset_first_delta and first_delta,
+                    utterance_id, delta, reset=reset_first_delta and first_delta,
                 )
                 first_delta = False
         except Exception as error:
@@ -914,16 +967,10 @@ class PipelineSession:
 
         full_text = "".join(chunks)
         if not full_text.strip():
-            return full_text, ModelUnavailableError(
-                "Translation model returned an empty stream.",
-            )
+            return full_text, ModelUnavailableError("Translation model returned an empty stream.")
         return full_text, None
 
-    async def send_raw_transcript(
-        self,
-        utterance_id: str,
-        source_text: str,
-    ) -> str:
+    async def send_raw_transcript(self, utterance_id: str, source_text: str) -> str:
         await self.ws.send_json(
             {
                 "type": "error",
@@ -940,12 +987,7 @@ class PipelineSession:
         except Exception:
             return []
 
-    async def send_translation_token(
-        self,
-        utterance_id: str,
-        token: str,
-        reset: bool = False,
-    ) -> None:
+    async def send_translation_token(self, utterance_id: str, token: str, reset: bool = False) -> None:
         event: dict[str, Any] = {
             "type": "translate.token",
             "token": token,
@@ -1036,11 +1078,7 @@ class PipelineSession:
 
     def _remember_overlap(self, raw: bytes, utterance_id: str) -> None:
         self.overlap_buffer.append(
-            {
-                "utteranceId": utterance_id,
-                "audio": raw,
-                "timestamp": time.time() - self.started_at,
-            },
+            {"utteranceId": utterance_id, "audio": raw, "timestamp": time.time() - self.started_at},
         )
         if len(self.overlap_buffer) > self.overlap_buffer_limit:
             self.overlap_buffer = self.overlap_buffer[-self.overlap_buffer_limit:]
@@ -1112,10 +1150,7 @@ class PipelineSession:
         code = "AI_MODEL_UNAVAILABLE" if isinstance(error, ModelUnavailableError) else "AI_PIPELINE_ERROR"
         LOGGER.error(
             "Pipeline error for session=%s client=%s code=%s: %s",
-            self.session_id,
-            self.client_id,
-            code,
-            error,
+            self.session_id, self.client_id, code, error,
         )
         message = str(error).casefold()
         if any(marker in message for marker in ("cuda out of memory", "gpu", "cublas", "cudnn")):
@@ -1149,11 +1184,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
     except Exception as error:
         try:
             await ws.send_json(
-                {
-                    "type": "error",
-                    "code": "AI_WORKER_ERROR",
-                    "message": str(error),
-                },
+                {"type": "error", "code": "AI_WORKER_ERROR", "message": str(error)},
             )
         except Exception:
             pass

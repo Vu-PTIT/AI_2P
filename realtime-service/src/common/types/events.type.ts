@@ -16,6 +16,27 @@ export type SttFinalEvent = {
   utteranceId: string;
 };
 
+/**
+ * A best-effort translation of an in-progress utterance produced by the
+ * fast path while the speaker is still talking.
+ *
+ * FE semantics: REPLACE the current translated caption for this
+ * utteranceId. Do NOT append. A newer translate.partial for the same
+ * utteranceId supersedes the previous one; translate.done supersedes
+ * every translate.partial and locks the line.
+ *
+ * Unlike translate.token, this carries the FULL translated text so far,
+ * not a delta. FE state can be a simple `Map<utteranceId, string>`.
+ */
+export type TranslatePartialEvent = {
+  type: 'translate.partial';
+  text: string;
+  sourceText: string;
+  speaker: Language;
+  clientId: string;
+  utteranceId: string;
+};
+
 export type TranslateTokenEvent = {
   type: 'translate.token';
   token: string;
@@ -43,6 +64,7 @@ export type ErrorEvent = {
 export type AiEvent =
   | SttPartialEvent
   | SttFinalEvent
+  | TranslatePartialEvent
   | TranslateTokenEvent
   | TranslateDoneEvent
   | ErrorEvent;
@@ -50,6 +72,7 @@ export type AiEvent =
 export type AiWorkerEvent =
   | Omit<SttPartialEvent, 'clientId'>
   | Omit<SttFinalEvent, 'clientId'>
+  | Omit<TranslatePartialEvent, 'clientId'>
   | Omit<TranslateTokenEvent, 'clientId'>
   | Omit<TranslateDoneEvent, 'clientId'>
   | Omit<ErrorEvent, 'clientId'>;
