@@ -1,0 +1,30 @@
+# Core
+numpy>=1.24
+torch>=2.0
+
+# ASR
+openai-whisper>=20231117
+# faster-whisper  # ponytail: install only when CTranslate2 speedup is needed.
+
+# Translation - Fast Path (NLLB)
+transformers>=4.35
+sentencepiece
+
+# LLM - Quality Path (FPT AI Factory, OpenAI-compatible API)
+openai>=1.30
+
+# RAG - Vector DB, embedding, and document parsing
+qdrant-client>=1.9
+sentence-transformers>=2.2
+pypdf>=4.0
+python-docx>=1.1
+python-pptx>=0.6
+
+# Audio
+# silero-vad       # VAD model is loaded through torch.hub.
+# noisereduce      # Optional: AUDIO_DENOISE=noisereduce.
+# pyannote.audio   # Optional: AUDIO_DIARIZATION=pyannote.
+# webrtcvad        # Optional backup VAD.
+
+# Utilities
+python-dotenv>=1.0

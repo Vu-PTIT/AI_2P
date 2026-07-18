@@ -4,4 +4,3 @@
 !.env.example
 *.local
 .agents
-ai.md

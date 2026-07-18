@@ -1,0 +1,66 @@
+[
+  {
+    "file": "audio_001.wav",
+    "duration_seconds": 5.04,
+    "segments": 1,
+    "text": "Đôi ba lần chạy theo cuộc vui của tuổi trẻ, chút sai lầm cơ cực cả thanh xuân.",
+    "stability": 0.973,
+    "elapsed_seconds": 37.14
+  },
+  {
+    "file": "audio_002.wav",  
+    "duration_seconds": 3.07,
+    "segments": 1,
+    "text": "Lội nói chẳng mất tiền mua, lựa lợi mà nói cho vua lòng nhau.",
+    "stability": 0.901,
+    "elapsed_seconds": 31.45
+  },
+  {
+    "file": "audio_003.wav",
+    "duration_seconds": 2.74,
+    "segments": 1,
+    "text": "nét đánh chết cái đẹp được tính quý hơn hình thức.",
+    "stability": 0.886,
+    "elapsed_seconds": 30.81
+  },
+  {
+    "file": "audio_005.wav",
+    "duration_seconds": 5.43,
+    "segments": 1,
+    "text": "Máu đỏ da vàng tôi là người Việt Nam, tự hào là con đắc Việt, cháu vua Hùng.",
+    "stability": 0.979,
+    "elapsed_seconds": 30.63
+  },
+  {
+    "file": "audio_006.wav",
+    "duration_seconds": 7.0,
+    "segments": 1,
+    "text": "Miền Nam thì có hoa mai, gặp nhau phải có một hai lời chào. Miền Bắc thì có hoa đào, gặp nhau phải có lời chào đầu tiên.",
+    "stability": 0.956,
+    "elapsed_seconds": 32.22
+  },
+  {
+    "file": "audio_008.wav",
+    "duration_seconds": 2.97,
+    "segments": 1,
+    "text": "Gần mức thì đến, gần đèn thì sáng, bạn bè làm nên",
+    "stability": 0.972,
+    "elapsed_seconds": 34.09
+  },
+  {
+    "file": "audio_009.wav",
+    "duration_seconds": 6.71,
+    "segments": 1,
+    "text": "Hy vọng chất rộng sáng, chuẩn, tự nhiên này sẽ có giá trị cho bất kỳ dự án nào bạn đang thực hiện. Chúc bạn thành công!",
+    "stability": 0.986,
+    "elapsed_seconds": 29.81
+  },
+  {
+    "file": "audio_010.wav",
+    "duration_seconds": 4.68,
+    "segments": 1,
+    "text": "Công trà như núi Thái Sơn, Nghị mẹ như nước trọng nguồn chạy ra.",
+    "stability": 0.944,
+    "elapsed_seconds": 30.24
+  }
+]
