@@ -5,8 +5,9 @@ This folder contains the AI worker used by `realtime-service`.
 The worker now expects real AI backends:
 
 - ASR: `openai-whisper`
-- Audio: numpy noise gate or optional `noisereduce`, Silero VAD through
-  `torch.hub`, channel-based speaker hints, optional pyannote diarization
+- Audio: numpy noise gate or optional `noisereduce`, strict Silero VAD through
+  `torch.hub`, an explicit NumPy energy-VAD emergency mode, channel-based
+  speaker hints, and optional pyannote diarization
 - Fast translation: NLLB/seq2seq through HuggingFace `transformers`
 - Quality translation: FPT AI Factory or any OpenAI-compatible chat API
 - RAG: `sentence-transformers` embeddings plus local Qdrant, with TXT/MD/JSON,
@@ -21,9 +22,10 @@ of inventing text.
 Install dependencies and make sure the model weights/API endpoint are available:
 
 ```bash
-cd ai
-pip install -r requirements.txt
-copy .env.example .env
+cd ai-service
+python -m pip install -r requirements.txt
+cp .env.example .env
+python main.py --check
 python main.py
 ```
 
@@ -39,6 +41,22 @@ Useful checks:
 python main.py --check
 python -m tests.test_smoke
 ```
+
+`python main.py --check` now preloads the configured VAD. With the default
+`AUDIO_VAD=silero`, it exits non-zero when Torch is missing or the Silero model
+cannot be loaded, instead of waiting for the first audio turn to fail. It does
+not call external FPT APIs. The first successful Silero preflight may download
+the model through `torch.hub`; keep its cache between deployments.
+
+For an emergency CPU-only demo while Torch/Silero is being repaired, set
+`AUDIO_VAD=energy`. This bypasses Torch only for VAD and uses a coarser NumPy
+energy detector, allowing configured remote FPT ASR/translation paths to keep
+receiving audio. Local Whisper/NLLB paths still require Torch. The fallback is
+never selected automatically; production remains strict by default.
+
+Detailed pipeline exceptions are written to the AI worker log with `sessionId`,
+`clientId`, and error code. Client events contain a stable public message rather
+than internal dependency paths.
 
 Ingest meeting documents into RAG before a meeting:
 
@@ -57,6 +75,7 @@ WHISPER_MODEL_DIR=./models/whisper
 WHISPER_DEVICE=cpu
 
 AUDIO_DENOISE=gate
+AUDIO_VAD=silero
 AUDIO_DIARIZATION=off
 PYANNOTE_MODEL=pyannote/speaker-diarization-3.1
 # PYANNOTE_AUTH_TOKEN=replace-with-your-huggingface-token

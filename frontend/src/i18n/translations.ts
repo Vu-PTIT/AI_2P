@@ -347,6 +347,11 @@ const en = {
   'feed.errorTitle': 'Translation is unavailable',
   'feed.errorDescription':
     'The realtime translation service could not connect. Try again while the meeting stays open.',
+  'feed.degradedTitle': 'Translation is temporarily limited',
+  'feed.processingWarning':
+    'One turn could not be processed. The meeting remains connected and the next turn will be tried automatically.',
+  'feed.rawTranscriptWarning':
+    'Translation failed for one turn, so its original transcript is shown instead. The meeting remains connected.',
   'feed.retry': 'Try translation again',
   'feed.conversationTurns': 'Conversation turns',
   'feed.newTurn': 'New turn',
@@ -399,6 +404,7 @@ const en = {
   'system.gatewayConnected': 'Gateway connected',
   'system.sessionEnded': 'Session ended',
   'system.connectionIssue': 'Connection issue',
+  'system.translationLimited': 'Translation limited',
   'system.latency': 'Translation latency',
   'system.awaitingMetrics': 'Awaiting metrics',
   'system.unavailable': 'Unavailable',
@@ -815,6 +821,11 @@ const vi = {
   'feed.errorTitle': 'Dịch thuật hiện không khả dụng',
   'feed.errorDescription':
     'Không thể kết nối dịch vụ dịch thời gian thực. Hãy thử lại trong khi cuộc họp vẫn mở.',
+  'feed.degradedTitle': 'Dịch thuật đang tạm thời bị hạn chế',
+  'feed.processingWarning':
+    'Một lượt nói chưa xử lý được. Cuộc họp vẫn kết nối và hệ thống sẽ tự động thử với lượt tiếp theo.',
+  'feed.rawTranscriptWarning':
+    'Một lượt dịch thất bại nên hệ thống hiển thị bản ghi gốc thay thế. Cuộc họp vẫn kết nối.',
   'feed.retry': 'Thử kết nối lại',
   'feed.conversationTurns': 'Các lượt hội thoại',
   'feed.newTurn': 'Lượt mới',
@@ -867,6 +878,7 @@ const vi = {
   'system.gatewayConnected': 'Đã kết nối cổng thời gian thực',
   'system.sessionEnded': 'Phiên đã kết thúc',
   'system.connectionIssue': 'Sự cố kết nối',
+  'system.translationLimited': 'Dịch thuật bị hạn chế',
   'system.latency': 'Độ trễ dịch thuật',
   'system.awaitingMetrics': 'Đang chờ số liệu',
   'system.unavailable': 'Không khả dụng',

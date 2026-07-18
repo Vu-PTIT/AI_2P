@@ -11,6 +11,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import os
 from copy import copy
 import struct
@@ -39,6 +40,7 @@ SAMPLE_RATE = 16000
 BYTES_PER_SAMPLE = 2
 PARTIAL_BYTES = int(SAMPLE_RATE * BYTES_PER_SAMPLE * 0.8)
 FINAL_BYTES = int(SAMPLE_RATE * BYTES_PER_SAMPLE * 1.2)
+LOGGER = logging.getLogger("vienmeet.ai")
 
 
 class WebSocketClosed(Exception):
@@ -689,6 +691,13 @@ class PipelineSession:
 
     async def _send_pipeline_error(self, error: Exception) -> None:
         code = "AI_MODEL_UNAVAILABLE" if isinstance(error, ModelUnavailableError) else "AI_PIPELINE_ERROR"
+        LOGGER.error(
+            "Pipeline error for session=%s client=%s code=%s: %s",
+            self.session_id,
+            self.client_id,
+            code,
+            error,
+        )
         message = str(error).casefold()
         if any(marker in message for marker in ("cuda out of memory", "gpu", "cublas", "cudnn")):
             self.monitor.report_gpu_failure()
@@ -699,7 +708,11 @@ class PipelineSession:
             {
                 "type": "error",
                 "code": code,
-                "message": str(error),
+                "message": (
+                    "The configured AI model is unavailable."
+                    if code == "AI_MODEL_UNAVAILABLE"
+                    else "The AI pipeline could not process this audio turn."
+                ),
             },
         )
 

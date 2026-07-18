@@ -195,7 +195,8 @@ class ASREngine:
             import whisper
         except ImportError as error:
             raise ModelUnavailableError(
-                "openai-whisper is required for ASR. Install ai/requirements.txt.",
+                "openai-whisper is required for local ASR. Install "
+                "ai-service/requirements.txt.",
             ) from error
 
         try:

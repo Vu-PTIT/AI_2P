@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import sys
 
 try:
     from dotenv import load_dotenv
@@ -18,6 +19,7 @@ from config.acronym import AcronymResolver
 from config.deployment import DeploymentConfig
 from config.glossary import GlossaryManager
 from fallback.monitor import HealthMonitor
+from model_errors import ModelUnavailableError
 from rag.engine import RAGEngine
 from session.memory import SessionManager
 from translation.fast_path import FastPathTranslator
@@ -43,11 +45,23 @@ def build_pipeline(tier: str = "server", lang_pair: str = "vi-en") -> dict:
     }
 
 
+def preflight_pipeline(pipeline: dict) -> dict[str, str]:
+    """Eagerly verify dependencies that otherwise load on first audio."""
+
+    return {
+        "vad": pipeline["audio"].preflight(),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default=None)
     parser.add_argument("--port", type=int, default=None)
-    parser.add_argument("--check", action="store_true", help="initialize modules and exit")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="preload local runtime dependencies and exit",
+    )
     parser.add_argument("--ingest-doc", action="append", default=[], help="ingest a document into local RAG")
     args = parser.parse_args()
 
@@ -61,8 +75,14 @@ def main() -> None:
 
     if args.check:
         config = pipeline["config"]
+        try:
+            checks = preflight_pipeline(pipeline)
+        except ModelUnavailableError as error:
+            print(f"Pipeline preflight failed: {error}", file=sys.stderr)
+            raise SystemExit(1) from error
         print(f"Pipeline initialized: tier={config.tier}, lang={config.lang_pair}")
-        print("All modules loaded.")
+        print(f"Audio VAD ready: {checks['vad']}")
+        print("Local runtime dependencies loaded. External FPT APIs were not called.")
         return
 
     asyncio.run(run_server(args.host, args.port))

@@ -5,10 +5,12 @@ import base64
 import json
 import os
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 import struct
 from tempfile import TemporaryDirectory
 import time
+from unittest.mock import patch
 
 import numpy as np
 
@@ -277,6 +279,72 @@ def test_audio_asr_and_fast_translation_use_models():
 
     translated = make_fast_translator().translate(asr_segment.text, "vi", "en")
     assert translated.translated_text == "hello KPI"
+
+
+def test_energy_vad_emergency_fallback():
+    sample_rate = 16000
+    samples = np.zeros(sample_rate, dtype=np.float32)
+    speech_start = int(sample_rate * 0.25)
+    speech_end = int(sample_rate * 0.75)
+    time_axis = np.arange(speech_end - speech_start) / sample_rate
+    samples[speech_start:speech_end] = 0.2 * np.sin(
+        2 * np.pi * 220 * time_axis,
+    )
+
+    pipeline = AudioPipeline(
+        vad_mode="energy",
+        denoise_mode="off",
+    )
+    assert pipeline.preflight() == "energy"
+
+    segments = pipeline.process(samples, sample_rate)
+    assert len(segments) == 1
+    assert segments[0].is_speech
+    assert segments[0].timestamp_start <= 0.25
+    assert segments[0].timestamp_end >= 0.75
+    assert pipeline.process(np.zeros(sample_rate, dtype=np.float32)) == []
+
+
+def test_silero_vad_missing_torch_fails_preflight():
+    with patch.dict(sys.modules, {"torch": None}):
+        pipeline = AudioPipeline(vad_mode="silero")
+        try:
+            pipeline.preflight()
+        except ModelUnavailableError as error:
+            message = str(error)
+            assert "AUDIO_VAD=silero" in message
+            assert "ai-service/requirements.txt" in message
+            assert "AUDIO_VAD=energy" in message
+        else:
+            raise AssertionError("Silero preflight must fail when Torch is unavailable")
+
+
+def test_invalid_vad_mode_fails_preflight():
+    pipeline = AudioPipeline(vad_mode="unknown")
+    try:
+        pipeline.preflight()
+    except ModelUnavailableError as error:
+        assert "Unsupported AUDIO_VAD mode" in str(error)
+    else:
+        raise AssertionError("Unknown VAD mode must fail before processing audio")
+
+
+def test_pipeline_error_event_hides_internal_details():
+    ws = FakeWs()
+    pipeline = PipelineSession(ws, "session-safe-error", "client-safe-error")
+    internal_error = ModelUnavailableError(
+        "Torch is missing from /srv/private/runtime.",
+    )
+
+    with patch.object(worker_module.LOGGER, "error") as log_error:
+        asyncio.run(pipeline._send_pipeline_error(internal_error))
+
+    event = ws.events[-1]
+    assert event["code"] == "AI_MODEL_UNAVAILABLE"
+    assert event["message"] == "The configured AI model is unavailable."
+    assert "Torch" not in event["message"]
+    log_error.assert_called_once()
+    assert "Torch is missing" in str(log_error.call_args)
 
 
 def test_fpt_asr_failure_does_not_fallback_to_local():
@@ -589,6 +657,10 @@ if __name__ == "__main__":
     test_rag_uses_vector_backend()
     test_rag_ingests_text_documents()
     test_audio_asr_and_fast_translation_use_models()
+    test_energy_vad_emergency_fallback()
+    test_silero_vad_missing_torch_fails_preflight()
+    test_invalid_vad_mode_fails_preflight()
+    test_pipeline_error_event_hides_internal_details()
     test_fpt_asr_failure_does_not_fallback_to_local()
     test_audio_denoise_channel_diarization_and_overlap()
     test_quality_path_uses_openai_compatible_client()

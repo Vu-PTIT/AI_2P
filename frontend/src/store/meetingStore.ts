@@ -18,6 +18,7 @@ import type {
   NoiseLevel,
 } from '../types/meeting'
 import type {
+  RealtimeErrorEvent,
   RealtimeServerEvent,
   RealtimeSessionState,
   RealtimeTranscriptEvent,
@@ -70,6 +71,7 @@ export interface MeetingStoreActions {
   resetMeeting: () => void
   setActiveTurnId: (turnId: string | null) => void
   setRealtimeStatus: (status: RealtimeSessionState['status']) => void
+  applyRealtimeWarning: (event: RealtimeErrorEvent) => void
   applyRealtimeEvent: (
     event: RealtimeServerEvent,
     receivedAt?: number,
@@ -115,6 +117,7 @@ const createInitialStoreState = (): MeetingStoreState => ({
     clientId: getOrCreateClientId(),
     status: 'connecting',
     lastError: null,
+    lastWarning: null,
   },
 })
 
@@ -481,6 +484,7 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
         ...state.realtimeSession,
         status: 'connecting',
         lastError: null,
+        lastWarning: null,
       },
     }))
   },
@@ -523,6 +527,7 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
         ...state.realtimeSession,
         status: 'connecting',
         lastError: null,
+        lastWarning: null,
       },
     }))
   },
@@ -542,8 +547,42 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
         status,
         lastError:
           status === 'error' ? state.realtimeSession.lastError : null,
+        lastWarning:
+          status === 'gateway-connected'
+            ? state.realtimeSession.lastWarning
+            : null,
       },
     }))
+  },
+
+  applyRealtimeWarning: (event) => {
+    set((state) => {
+      const activeTurn = state.meeting.turns.find(
+        (turn) => turn.id === state.activeTurnId,
+      )
+      const shouldFailActiveTurn =
+        event.code !== 'RAW_TRANSCRIPT' &&
+        activeTurn !== undefined &&
+        activeTurn.status !== 'final' &&
+        (!event.clientId || activeTurn.speakerId === event.clientId)
+
+      return {
+        meeting: shouldFailActiveTurn
+          ? {
+              ...state.meeting,
+              turns: state.meeting.turns.map((turn) =>
+                turn.id === activeTurn.id
+                  ? { ...turn, status: 'failed' }
+                  : turn,
+              ),
+            }
+          : state.meeting,
+        realtimeSession: {
+          ...state.realtimeSession,
+          lastWarning: event,
+        },
+      }
+    })
   },
 
   applyRealtimeEvent: (event, receivedAt = Date.now()) => {
@@ -555,6 +594,7 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
               clientId: event.clientId,
               status: 'gateway-connected',
               lastError: null,
+              lastWarning: null,
             },
           }
         case 'session.participants': {
@@ -601,13 +641,21 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
               status: 'ended',
             },
           }
-        case 'error':
+        case 'error': {
+          const activeTurn = state.meeting.turns.find(
+            (turn) => turn.id === state.activeTurnId,
+          )
+          const shouldFailActiveTurn =
+            activeTurn !== undefined &&
+            activeTurn.status !== 'final' &&
+            (!event.clientId || activeTurn.speakerId === event.clientId)
+
           return {
-            meeting: state.activeTurnId
+            meeting: shouldFailActiveTurn
               ? {
                   ...state.meeting,
                   turns: state.meeting.turns.map((turn) =>
-                    turn.id === state.activeTurnId
+                    turn.id === activeTurn.id
                       ? { ...turn, status: 'failed' }
                       : turn,
                   ),
@@ -617,8 +665,10 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
               ...state.realtimeSession,
               status: 'error',
               lastError: event,
+              lastWarning: null,
             },
           }
+        }
         case 'stt.partial':
         case 'stt.final':
         case 'translate.token':

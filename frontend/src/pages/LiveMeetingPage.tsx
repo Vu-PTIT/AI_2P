@@ -55,6 +55,9 @@ export default function LiveMeetingPage() {
   const realtimeStatus = useMeetingStore(
     (state) => state.realtimeSession.status,
   )
+  const realtimeWarning = useMeetingStore(
+    (state) => state.realtimeSession.lastWarning,
+  )
   const clientId = useMeetingStore(
     (state) => state.realtimeSession.clientId,
   )
@@ -414,6 +417,7 @@ export default function LiveMeetingPage() {
             onAddNote={() => setNoteDialogOpen(true)}
             onRetryRealtime={retryConnection}
             realtimeStatus={realtimeStatus}
+            realtimeWarning={realtimeWarning}
             prioritizeTranslation={translationFocused}
           />
         )}

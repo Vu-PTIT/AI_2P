@@ -1,4 +1,4 @@
-"""Audio front-end backed by denoising, Silero VAD, and optional diarization."""
+"""Audio front-end backed by denoising, configurable VAD, and diarization."""
 
 from dataclasses import dataclass
 import os
@@ -34,6 +34,7 @@ class AudioPipeline:
         diarizer: object | None = None,
         denoise_mode: str | None = None,
         diarization_mode: str | None = None,
+        vad_mode: str | None = None,
     ):
         self.tier = tier
         self._vad_model = vad_model
@@ -42,7 +43,19 @@ class AudioPipeline:
         self._diarizer = diarizer
         self.denoise_mode = (denoise_mode or os.getenv("AUDIO_DENOISE", "gate")).casefold()
         self.diarization_mode = (diarization_mode or os.getenv("AUDIO_DIARIZATION", "off")).casefold()
+        self.vad_mode = (vad_mode or os.getenv("AUDIO_VAD", "silero")).casefold()
         self._torch = None
+        self._vad_backend = (
+            "injected"
+            if vad_model is not None and get_speech_timestamps is not None
+            else None
+        )
+
+    def preflight(self) -> str:
+        """Load the configured VAD now so deployment checks fail before traffic."""
+
+        self._ensure_vad()
+        return self._vad_backend or self.vad_mode
 
     def process(self, raw_audio: np.ndarray, sample_rate: int = 16000) -> list[AudioSegment]:
         raw = np.asarray(raw_audio)
@@ -93,11 +106,24 @@ class AudioPipeline:
         if self._vad_model is not None and self._get_speech_timestamps is not None:
             return
 
+        if self.vad_mode == "energy":
+            self._vad_model = object()
+            self._get_speech_timestamps = self._energy_speech_timestamps
+            self._vad_backend = "energy"
+            return
+
+        if self.vad_mode != "silero":
+            raise ModelUnavailableError(
+                f"Unsupported AUDIO_VAD mode: {self.vad_mode}. Use silero or energy.",
+            )
+
         try:
             import torch
         except ImportError as error:
             raise ModelUnavailableError(
-                "Torch is required for Silero VAD. Install ai/requirements.txt.",
+                "Torch is required when AUDIO_VAD=silero. Install "
+                "ai-service/requirements.txt, or set AUDIO_VAD=energy "
+                "for the reduced-accuracy emergency fallback.",
             ) from error
 
         try:
@@ -116,12 +142,76 @@ class AudioPipeline:
                 )
         except Exception as error:
             raise ModelUnavailableError(
-                "Silero VAD model is unavailable. Preload torch hub cache or allow model download.",
+                "Silero VAD is unavailable. Allow its first torch.hub download "
+                "and persist the Torch cache, or set AUDIO_VAD=energy for the "
+                "reduced-accuracy emergency fallback.",
             ) from error
 
         self._torch = torch
         self._vad_model = model
         self._get_speech_timestamps = utils[0]
+        self._vad_backend = "silero"
+
+    def _energy_speech_timestamps(
+        self,
+        audio,
+        _model,
+        sampling_rate: int = 16000,
+    ) -> list[dict[str, int]]:
+        """Return coarse speech regions without external ML dependencies."""
+
+        samples = np.asarray(audio, dtype=np.float32).reshape(-1)
+        if samples.size == 0 or sampling_rate <= 0:
+            return []
+
+        frame_size = max(1, int(sampling_rate * 0.03))
+        frame_count = int(np.ceil(samples.size / frame_size))
+        padded = np.pad(
+            samples,
+            (0, frame_count * frame_size - samples.size),
+        )
+        frames = padded.reshape(frame_count, frame_size)
+        rms = np.sqrt(np.mean(np.square(frames), axis=1))
+        peak_rms = float(np.max(rms))
+        if peak_rms < 0.008:
+            return []
+
+        noise_floor = float(np.percentile(rms, 20))
+        threshold = max(
+            0.008,
+            min(noise_floor * 2.5, peak_rms * 0.6),
+        )
+        active_frames = np.flatnonzero(rms >= threshold)
+        if active_frames.size == 0:
+            return []
+
+        max_gap_frames = max(1, int(0.2 / 0.03))
+        min_speech_frames = max(1, int(0.12 / 0.03))
+        padding_frames = max(1, int(0.06 / 0.03))
+        regions: list[tuple[int, int]] = []
+        region_start = int(active_frames[0])
+        previous_frame = region_start
+
+        for frame_index_value in active_frames[1:]:
+            frame_index = int(frame_index_value)
+            if frame_index - previous_frame > max_gap_frames:
+                regions.append((region_start, previous_frame))
+                region_start = frame_index
+            previous_frame = frame_index
+        regions.append((region_start, previous_frame))
+
+        timestamps = []
+        for start_frame, end_frame in regions:
+            if end_frame - start_frame + 1 < min_speech_frames:
+                continue
+            start = max(0, (start_frame - padding_frames) * frame_size)
+            end = min(
+                samples.size,
+                (end_frame + padding_frames + 1) * frame_size,
+            )
+            if end > start:
+                timestamps.append({"start": start, "end": end})
+        return timestamps
 
     def _normalize(self, raw_audio: np.ndarray) -> np.ndarray:
         audio = np.asarray(raw_audio)

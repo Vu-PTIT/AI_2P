@@ -59,6 +59,8 @@ export interface RealtimeErrorEvent {
   type: 'error'
   code: string
   message: string
+  clientId?: string | null
+  displayName?: string | null
 }
 
 export type RealtimeTranscriptEvent =
@@ -85,6 +87,7 @@ export interface RealtimeSessionState {
   clientId: string
   status: RealtimeSessionStatus
   lastError: RealtimeErrorEvent | null
+  lastWarning: RealtimeErrorEvent | null
 }
 
 export interface RealtimeConnectionQuery {
@@ -92,6 +95,9 @@ export interface RealtimeConnectionQuery {
   clientId: string
   domain: 'business'
   languagePair: 'vi-en'
+  title: string
+  displayName: string
+  localLanguage: Language
 }
 
 export interface SpeakerSwitchCommand {

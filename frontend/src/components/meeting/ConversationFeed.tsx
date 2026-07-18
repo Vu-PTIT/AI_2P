@@ -19,7 +19,10 @@ import type {
   Language,
   LanguageOrder,
 } from '@/types/meeting'
-import type { RealtimeSessionStatus } from '@/types/realtime'
+import type {
+  RealtimeErrorEvent,
+  RealtimeSessionStatus,
+} from '@/types/realtime'
 import { ConversationTurnCard } from './ConversationTurnCard'
 
 export interface ConversationFeedProps {
@@ -33,6 +36,7 @@ export interface ConversationFeedProps {
   onAddNote: () => void
   onRetryRealtime: () => void
   realtimeStatus?: RealtimeSessionStatus
+  realtimeWarning?: RealtimeErrorEvent | null
   prioritizeTranslation?: boolean
 }
 
@@ -47,6 +51,7 @@ export function ConversationFeed({
   onAddNote,
   onRetryRealtime,
   realtimeStatus,
+  realtimeWarning,
   prioritizeTranslation = false,
 }: ConversationFeedProps) {
   const { t } = useTranslation()
@@ -94,6 +99,10 @@ export function ConversationFeed({
     }
   >
   const currentRealtimeState = realtimeState[effectiveRealtimeStatus]
+  const warningDescriptionKey =
+    realtimeWarning?.code === 'RAW_TRANSCRIPT'
+      ? 'feed.rawTranscriptWarning'
+      : 'feed.processingWarning'
 
   const scrollToTail = (behavior: ScrollBehavior) => {
     const container = scrollRef.current
@@ -208,6 +217,27 @@ export function ConversationFeed({
             onRetry={onRetryRealtime}
             retryLabel={t('feed.retry')}
           />
+        )}
+
+      {realtimeWarning &&
+        effectiveRealtimeStatus === 'gateway-connected' && (
+          <div
+            role="alert"
+            className="flex gap-3 border-b border-warning/20 bg-warning/8 px-4 py-3 text-xs sm:px-5"
+          >
+            <CircleAlert
+              className="mt-0.5 size-4 shrink-0 text-warning-soft"
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <p className="font-semibold text-ink">
+                {t('feed.degradedTitle')}
+              </p>
+              <p className="mt-1 leading-5 text-muted">
+                {t(warningDescriptionKey)}
+              </p>
+            </div>
+          </div>
         )}
 
       <div

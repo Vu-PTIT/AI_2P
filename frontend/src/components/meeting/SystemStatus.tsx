@@ -19,15 +19,22 @@ export function SystemStatus() {
   const realtimeStatus = useMeetingStore(
     (state) => state.realtimeSession.status,
   )
+  const realtimeWarning = useMeetingStore(
+    (state) => state.realtimeSession.lastWarning,
+  )
   const noiseLevel = useMeetingStore((state) => state.noiseLevel)
   const noiseValueKey =
     noiseLevel === 'unknown'
       ? 'system.awaitingMetrics'
       : (`common.${noiseLevel}` as const)
   const latencyValueKey =
-    realtimeStatus === 'error'
+    realtimeStatus === 'error' || realtimeWarning
       ? 'system.unavailable'
       : 'system.awaitingMetrics'
+  const connectionValueKey =
+    realtimeStatus === 'gateway-connected' && realtimeWarning
+      ? 'system.translationLimited'
+      : connectionValueKeys[realtimeStatus]
   const statusItems = [
     {
       labelKey: 'system.room',
@@ -36,7 +43,7 @@ export function SystemStatus() {
     },
     {
       labelKey: 'system.connection',
-      valueKey: connectionValueKeys[realtimeStatus],
+      valueKey: connectionValueKey,
       icon: Radio,
     },
     {

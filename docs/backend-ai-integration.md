@@ -26,6 +26,8 @@ Tạo `ai-service/.env` từ `.env.example`. Không commit file `.env`.
 AI_WS_HOST=127.0.0.1
 AI_WS_PORT=8765
 
+AUDIO_VAD=silero
+
 FPT_BASE_URL=https://mkp-api.fptcloud.com
 FPT_API_KEY=replace-with-your-key
 
@@ -83,8 +85,14 @@ npm test
 npm run start:dev
 ```
 
-`python main.py --check` chỉ kiểm tra khởi tạo module; lệnh này không gọi API
-FPT thật.
+`python main.py --check` preload VAD đã cấu hình và thoát khác `0` nếu thiếu
+Torch hoặc không tải được Silero. Lệnh này không gọi API FPT thật. Production
+giữ `AUDIO_VAD=silero`; khi cần cứu demo tạm thời có thể dùng
+`AUDIO_VAD=energy`, là detector năng lượng NumPy có độ chính xác thấp hơn và
+không được tự động bật. Chế độ này chỉ thay thế VAD; Whisper/NLLB local vẫn cần
+Torch, còn các đường ASR/dịch FPT từ xa vẫn có thể nhận audio. Lần preload
+Silero đầu tiên có thể tải model qua `torch.hub`; cần giữ cache Torch giữa các
+lần deploy.
 
 ## 3. Vòng đời kết nối
 
@@ -218,12 +226,15 @@ Bridge hiện chỉ chấp nhận và forward năm event sau:
 {
   "type": "error",
   "code": "AI_MODEL_UNAVAILABLE",
-  "message": "FPT ASR failed: ..."
+  "message": "The configured AI model is unavailable."
 }
 ```
 
 `realtime-service` gắn thêm `clientId` và `displayName`, sau đó broadcast event
 vào Socket.IO room tương ứng với `sessionId`.
+
+Chi tiết exception chỉ được ghi vào log AI worker cùng `sessionId`, `clientId`
+và error code; không gửi đường dẫn dependency hoặc thông tin nội bộ tới client.
 
 ### Event nâng cao chưa được bridge forward
 
