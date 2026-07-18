@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Trang kiểm tra trực tiếp WebSocket AI, STT và dịch streaming của ViEnMeet."
+    />
+    <title>ViEnMeet · AI Speech Lab</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 fill=%22%230c7458%22/><text x=%2232%22 y=%2240%22 text-anchor=%22middle%22 font-size=%2224%22 fill=%22white%22>V/E</text></svg>"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="masthead">
+        <a class="brand" href="./" aria-label="ViEnMeet AI Speech Lab">
+          <span class="brand-mark" aria-hidden="true">V/E</span>
+          <span>
+            <strong>AI Speech Lab</strong>
+            <small>Direct worker diagnostic</small>
+          </span>
+        </a>
+        <div class="connection-summary" aria-live="polite">
+          <span class="status-dot" id="connectionDot"></span>
+          <span id="connectionSummary">Chưa kết nối</span>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="pageTitle">
+          <div>
+            <p class="eyebrow">VIENMEET / PIPELINE TEST 01</p>
+            <h1 id="pageTitle">Nói một câu.<br />Theo dõi từng delta.</h1>
+          </div>
+          <p class="hero-note">
+            Trang này bỏ qua frontend meeting và backend. Microphone được gửi
+            thẳng tới <code>ai-service</code> để tách lỗi STT, endpointing và
+            translation streaming.
+          </p>
+        </section>
+
+        <section class="control-bench" aria-labelledby="benchTitle">
+          <div class="bench-heading">
+            <p class="step-index">01</p>
+            <div>
+              <h2 id="benchTitle">Thiết lập phép thử</h2>
+              <p>Chọn đúng ngôn ngữ bạn sắp nói, sau đó kết nối AI.</p>
+            </div>
+          </div>
+
+          <fieldset class="direction-switch" id="directionSwitch">
+            <legend>Chiều dịch</legend>
+            <label class="direction-option">
+              <input type="radio" name="direction" value="en" checked />
+              <span class="language-code">EN</span>
+              <span class="direction-arrow" aria-hidden="true">→</span>
+              <span class="language-code">VI</span>
+              <small>Nói tiếng Anh</small>
+            </label>
+            <label class="direction-option">
+              <input type="radio" name="direction" value="vi" />
+              <span class="language-code">VI</span>
+              <span class="direction-arrow" aria-hidden="true">→</span>
+              <span class="language-code">EN</span>
+              <small>Nói tiếng Việt</small>
+            </label>
+          </fieldset>
+
+          <div class="connection-form">
+            <label for="workerUrl">AI WebSocket URL</label>
+            <div class="connection-row">
+              <input
+                id="workerUrl"
+                name="workerUrl"
+                type="url"
+                value="ws://127.0.0.1:8765/ws/session"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <button class="button button-dark" id="connectButton" type="button">
+                Kết nối AI
+              </button>
+            </div>
+            <p class="field-help">
+              Worker local mặc định:
+              <code>ws://127.0.0.1:8765/ws/session</code>
+            </p>
+          </div>
+        </section>
+
+        <section class="recording-deck" aria-labelledby="recordingTitle">
+          <div class="recording-copy">
+            <p class="step-index">02</p>
+            <div>
+              <p class="eyebrow" id="directionEyebrow">ENGLISH → VIETNAMESE</p>
+              <h2 id="recordingTitle">Giữ nhịp tự nhiên, nói trọn một câu.</h2>
+              <p id="recordingHint">
+                Ví dụ: “Hello, I would like to test a complete English
+                sentence.”
+              </p>
+            </div>
+          </div>
+
+          <div class="recorder">
+            <div class="level-wrap" aria-label="Mức âm microphone">
+              <div class="level-track">
+                <div class="level-fill" id="levelFill"></div>
+              </div>
+              <span id="levelValue">0</span>
+            </div>
+
+            <label class="device-field" for="microphoneSelect">
+              Microphone
+              <select id="microphoneSelect">
+                <option value="">Mặc định của hệ thống</option>
+              </select>
+            </label>
+
+            <button
+              class="record-button"
+              id="recordButton"
+              type="button"
+              disabled
+              aria-pressed="false"
+            >
+              <span class="record-icon" aria-hidden="true"></span>
+              <span id="recordButtonLabel">Chờ AI sẵn sàng</span>
+            </button>
+            <p class="recorder-state" id="recorderState" role="status">
+              Kết nối AI trước khi bắt đầu nói.
+            </p>
+          </div>
+        </section>
+
+        <section class="results" aria-labelledby="resultsTitle">
+          <div class="section-title">
+            <div>
+              <p class="step-index">03</p>
+              <h2 id="resultsTitle">Kết quả theo lượt nói</h2>
+            </div>
+            <button class="text-button" id="clearResultsButton" type="button">
+              Xóa kết quả
+            </button>
+          </div>
+
+          <div class="empty-state" id="emptyResults">
+            <span>NO SIGNAL YET</span>
+            <p>Transcript và bản dịch streaming sẽ xuất hiện ở đây.</p>
+          </div>
+          <div class="turn-list" id="turnList" aria-live="polite"></div>
+        </section>
+
+        <section class="diagnostics" aria-labelledby="diagnosticsTitle">
+          <div class="section-title">
+            <div>
+              <p class="step-index">04</p>
+              <h2 id="diagnosticsTitle">Raw event stream</h2>
+            </div>
+            <div class="diagnostic-actions">
+              <button class="text-button" id="copyEventsButton" type="button">
+                Copy log
+              </button>
+              <button class="text-button" id="clearEventsButton" type="button">
+                Xóa log
+              </button>
+            </div>
+          </div>
+          <pre id="eventLog" tabindex="0" aria-label="WebSocket event log"></pre>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

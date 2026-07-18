@@ -54,10 +54,33 @@ const createTurn = (
     timestampSeconds: getElapsedSeconds(meeting, receivedAt),
     startedAt: receivedAt,
     originalText:
-      event.type === 'translate.done' ? event.sourceText : event.text,
+      event.type === 'translate.done' ||
+      event.type === 'translate.partial'
+        ? event.sourceText
+        : event.text,
     translatedText:
-      event.type === 'translate.done' ? event.fullText : '',
-    status: event.type === 'stt.partial' ? 'transcribing' : 'draft',
+      event.type === 'translate.done'
+        ? event.fullText
+        : event.type === 'translate.partial'
+          ? event.text
+          : '',
+    status:
+      event.type === 'stt.partial' ||
+      event.type === 'translate.partial'
+        ? 'transcribing'
+        : event.type === 'translate.done'
+          ? 'final'
+          : 'draft',
+    sourceTextStatus:
+      event.type === 'stt.final' || event.type === 'translate.done'
+        ? 'final'
+        : 'partial',
+    translatedTextStatus:
+      event.type === 'translate.partial'
+        ? 'partial'
+        : event.type === 'translate.done'
+          ? 'final'
+          : 'idle',
   }
 }
 
@@ -99,10 +122,15 @@ export const applyRealtimeTranscriptEvent = (
 
   switch (event.type) {
     case 'stt.partial':
+      if (baseTurn.sourceTextStatus === 'final') {
+        return null
+      }
+
       nextTurn = {
         ...baseTurn,
         originalText: event.text,
         status: 'transcribing',
+        sourceTextStatus: 'partial',
       }
       break
     case 'stt.final':
@@ -110,15 +138,42 @@ export const applyRealtimeTranscriptEvent = (
         ...baseTurn,
         originalText: event.text,
         status: 'draft',
+        sourceTextStatus: 'final',
+      }
+      break
+    case 'translate.partial':
+      if (
+        baseTurn.translatedTextStatus === 'streaming' ||
+        baseTurn.translatedTextStatus === 'final'
+      ) {
+        return null
+      }
+
+      nextTurn = {
+        ...baseTurn,
+        originalText: baseTurn.originalText || event.sourceText,
+        translatedText: event.text,
+        status:
+          baseTurn.sourceTextStatus === 'final'
+            ? 'draft'
+            : 'transcribing',
+        translatedTextStatus: 'partial',
       }
       break
     case 'translate.token':
-      nextTurn = {
-        ...baseTurn,
-        translatedText: event.reset
-          ? event.token
-          : `${baseTurn.translatedText}${event.token}`,
-        status: 'draft',
+      {
+        const startingStream =
+          baseTurn.translatedTextStatus !== 'streaming' ||
+          event.reset === true
+
+        nextTurn = {
+          ...baseTurn,
+          translatedText: startingStream
+            ? event.token
+            : `${baseTurn.translatedText}${event.token}`,
+          status: 'draft',
+          translatedTextStatus: 'streaming',
+        }
       }
       break
     case 'translate.done':
@@ -127,6 +182,8 @@ export const applyRealtimeTranscriptEvent = (
         originalText: event.sourceText,
         translatedText: event.fullText,
         status: 'final',
+        sourceTextStatus: 'final',
+        translatedTextStatus: 'final',
         endedAt: receivedAt,
       }
       break

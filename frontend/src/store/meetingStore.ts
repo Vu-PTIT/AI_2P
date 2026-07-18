@@ -389,6 +389,7 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
                 ...turn,
                 translatedText: normalizedTranslation,
                 status: 'final',
+                translatedTextStatus: 'final',
                 isEdited: true,
               }
             : turn,
@@ -671,6 +672,7 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
         }
         case 'stt.partial':
         case 'stt.final':
+        case 'translate.partial':
         case 'translate.token':
         case 'translate.done': {
           const meeting = syncRealtimeParticipant(

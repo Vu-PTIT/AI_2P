@@ -33,6 +33,16 @@ export interface SttFinalEvent {
   displayName?: string | null
 }
 
+export interface TranslatePartialEvent {
+  type: 'translate.partial'
+  text: string
+  sourceText: string
+  speaker: Language
+  utteranceId: string
+  clientId?: string | null
+  displayName?: string | null
+}
+
 export interface TranslateTokenEvent {
   type: 'translate.token'
   token: string
@@ -67,6 +77,7 @@ export interface RealtimeErrorEvent {
 export type RealtimeTranscriptEvent =
   | SttPartialEvent
   | SttFinalEvent
+  | TranslatePartialEvent
   | TranslateTokenEvent
   | TranslateDoneEvent
 

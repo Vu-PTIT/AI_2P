@@ -10,6 +10,7 @@ import {
   parseSttFinal,
   parseSttPartial,
   parseTranslateDone,
+  parseTranslatePartial,
   parseTranslateToken,
 } from '@/lib/realtimePayloads'
 import { useMeetingStore } from '@/store/meetingStore'
@@ -130,6 +131,12 @@ export function useRealtimeConnection({
     })
     socket.on('stt.final', (value: unknown) => {
       const event = parseSttFinal(value)
+      if (event) {
+        applyRealtimeEvent(event)
+      }
+    })
+    socket.on('translate.partial', (value: unknown) => {
+      const event = parseTranslatePartial(value)
       if (event) {
         applyRealtimeEvent(event)
       }

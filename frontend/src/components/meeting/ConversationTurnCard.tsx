@@ -37,7 +37,20 @@ export function ConversationTurnCard({
   const [correction, setCorrection] = useState('')
   const { copy, copyState } = useClipboard()
   const isVietnamese = turn.sourceLanguage === 'vi'
-  const canAct = turn.translatedText.trim().length > 0
+  const sourceTextStatus =
+    turn.sourceTextStatus ??
+    (turn.status === 'listening' || turn.status === 'transcribing'
+      ? 'partial'
+      : 'final')
+  const translatedTextStatus =
+    turn.translatedTextStatus ??
+    (turn.status === 'final'
+      ? 'final'
+      : turn.translatedText
+        ? 'streaming'
+        : 'idle')
+  const canAct =
+    turn.status === 'final' && turn.translatedText.trim().length > 0
   const translationIsPrioritized =
     prioritizedLanguage === undefined ||
     turn.targetLanguage === prioritizedLanguage
@@ -127,6 +140,8 @@ export function ConversationTurnCard({
                   className={cn(
                     'min-h-5 break-words leading-6 text-muted-strong',
                     compact ? 'text-sm' : 'text-sm',
+                    sourceTextStatus === 'partial' &&
+                      'italic text-muted',
                   )}
                 >
                   {turn.originalText ||
@@ -183,9 +198,13 @@ export function ConversationTurnCard({
                 <p
                   lang={turn.targetLanguage}
                   className={cn(
-                    'min-h-7 break-words font-semibold leading-7 text-ink',
+                    'min-h-7 break-words leading-7 text-ink',
                     compact ? 'text-sm' : 'text-[0.9375rem]',
-                    turn.status === 'draft' && 'text-ink-soft',
+                    translatedTextStatus === 'partial'
+                      ? 'font-normal italic text-muted'
+                      : 'font-semibold',
+                    translatedTextStatus === 'streaming' &&
+                      'text-ink-soft',
                   )}
                 >
                   {turn.translatedText ||

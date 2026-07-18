@@ -12,6 +12,14 @@ export type TranslationStatus =
   | 'low-confidence'
   | 'failed'
 
+export type SourceTextStatus = 'partial' | 'final'
+
+export type TranslatedTextStatus =
+  | 'idle'
+  | 'partial'
+  | 'streaming'
+  | 'final'
+
 export type MeetingStatus = 'setup' | 'live' | 'ended'
 
 export type MicrophoneTestStatus =
@@ -60,6 +68,8 @@ export interface ConversationTurn {
   originalText: string
   translatedText: string
   status: TranslationStatus
+  sourceTextStatus?: SourceTextStatus
+  translatedTextStatus?: TranslatedTextStatus
   isEdited?: boolean
 }
 

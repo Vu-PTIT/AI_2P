@@ -6,6 +6,7 @@ import type {
   SttFinalEvent,
   SttPartialEvent,
   TranslateDoneEvent,
+  TranslatePartialEvent,
   TranslateTokenEvent,
 } from '@/types/realtime'
 
@@ -98,6 +99,33 @@ export const parseSttFinal = (
   const event = parseSttPartial(value)
 
   return event ? { ...event, type: 'stt.final' } : null
+}
+
+export const parseTranslatePartial = (
+  value: unknown,
+): TranslatePartialEvent | null => {
+  const payload = asRecord(value)
+  const text = payload && asOptionalString(payload.text)
+  const sourceText = payload && asOptionalString(payload.sourceText)
+  const speaker = payload && asLanguage(payload.speaker)
+  const utteranceId = payload && asNonEmptyString(payload.utteranceId)
+
+  return (
+    payload &&
+    text !== null &&
+    sourceText !== null &&
+    speaker &&
+    utteranceId
+      ? {
+          type: 'translate.partial',
+          text,
+          sourceText,
+          speaker,
+          utteranceId,
+          ...participantMetadata(payload),
+        }
+      : null
+  )
 }
 
 export const parseTranslateToken = (
