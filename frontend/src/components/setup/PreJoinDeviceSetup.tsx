@@ -3,13 +3,19 @@ import type { ReactNode } from 'react'
 import {
   Camera,
   CameraOff,
+  Languages,
   LoaderCircle,
   Mic,
   MicOff,
+  Speaker,
 } from 'lucide-react'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { useTranslation } from '@/hooks/useTranslation'
+import type {
+  MediaDevicesState,
+  MicrophonePermissionState,
+} from '@/hooks/useMediaDevices'
 import type { TranslationKey } from '@/i18n/translations'
 import { cn } from '@/lib/utils'
 import { useMeetingStore } from '@/store/meetingStore'
@@ -32,8 +38,26 @@ const cameraStatusKeys: Record<
   unavailable: 'prejoin.cameraUnavailable',
 }
 
-export function PreJoinDeviceSetup() {
+const microphonePermissionKeys: Record<
+  MicrophonePermissionState,
+  TranslationKey
+> = {
+  unknown: 'devices.permissionUnknown',
+  prompt: 'devices.permissionPrompt',
+  granted: 'devices.permissionGranted',
+  denied: 'devices.permissionDenied',
+  unsupported: 'devices.permissionOnUse',
+}
+
+export interface PreJoinDeviceSetupProps {
+  mediaDevices: MediaDevicesState
+}
+
+export function PreJoinDeviceSetup({
+  mediaDevices,
+}: PreJoinDeviceSetupProps) {
   const { t } = useTranslation()
+  const meeting = useMeetingStore((state) => state.meeting)
   const microphoneEnabled = useMeetingStore(
     (state) => state.microphoneEnabled,
   )
@@ -52,6 +76,8 @@ export function PreJoinDeviceSetup() {
   const setAudioInputLevel = useMeetingStore(
     (state) => state.setAudioInputLevel,
   )
+  const setMicrophone = useMeetingStore((state) => state.setMicrophone)
+  const setSpeaker = useMeetingStore((state) => state.setSpeaker)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [cameraStatus, setCameraStatus] =
     useState<CameraPreviewStatus>(
@@ -238,6 +264,93 @@ export function PreJoinDeviceSetup() {
               }
               onClick={handleCameraToggle}
             />
+          </div>
+
+          <div className="mt-5 grid gap-4 border-t border-line pt-5">
+            <label className="grid gap-2 text-xs font-semibold text-ink-soft">
+              {t('devices.microphone')}
+              <select
+                value={meeting.microphoneId}
+                onChange={(event) => setMicrophone(event.target.value)}
+                disabled={
+                  mediaDevices.listStatus !== 'ready' ||
+                  mediaDevices.microphones.length === 0
+                }
+                aria-describedby="microphone-device-status"
+                className="h-11 min-w-0 rounded-[10px] border border-line-strong bg-panel px-3 text-sm text-ink outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {mediaDevices.microphones.length === 0 ? (
+                  <option value="">{t('devices.noMicrophone')}</option>
+                ) : (
+                  mediaDevices.microphones.map((device, index) => (
+                    <option key={device.id} value={device.id}>
+                      {device.label ||
+                        t('devices.microphoneFallback', {
+                          count: index + 1,
+                        })}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+
+            <div id="microphone-device-status">
+              <StatusBadge
+                tone={
+                  mediaDevices.permissionState === 'denied'
+                    ? 'danger'
+                    : mediaDevices.permissionState === 'granted'
+                      ? 'success'
+                      : 'neutral'
+                }
+              >
+                {t(
+                  microphonePermissionKeys[
+                    mediaDevices.permissionState
+                  ],
+                )}
+              </StatusBadge>
+            </div>
+
+            <label className="grid gap-2 text-xs font-semibold text-ink-soft">
+              {t('devices.speaker')}
+              {mediaDevices.outputSelectionSupported &&
+              mediaDevices.speakers.length > 0 ? (
+                <select
+                  value={meeting.speakerId}
+                  onChange={(event) => setSpeaker(event.target.value)}
+                  className="h-11 min-w-0 rounded-[10px] border border-line-strong bg-panel px-3 text-sm text-ink outline-none focus:border-primary"
+                >
+                  {mediaDevices.speakers.map((device, index) => (
+                    <option key={device.id} value={device.id}>
+                      {device.label ||
+                        t('devices.speakerFallback', {
+                          count: index + 1,
+                        })}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="flex min-h-11 items-center gap-3 rounded-[10px] border border-line bg-panel-muted/65 px-3 text-sm font-normal text-muted-strong">
+                  <Speaker className="size-4 shrink-0" aria-hidden="true" />
+                  {t('devices.systemSpeaker')}
+                </div>
+              )}
+            </label>
+
+            <div className="flex items-center justify-between gap-4 rounded-[10px] border border-line bg-panel-muted/65 px-3 py-3">
+              <span className="flex items-center gap-2 text-xs font-semibold text-muted-strong">
+                <Languages className="size-4" aria-hidden="true" />
+                {t('devices.speakingLanguage')}
+              </span>
+              <span className="text-sm font-semibold text-ink">
+                {t(
+                  meeting.localLanguage === 'vi'
+                    ? 'common.vietnamese'
+                    : 'common.english',
+                )}
+              </span>
+            </div>
           </div>
 
           <p className="mt-4 text-xs leading-5 text-muted">

@@ -19,6 +19,7 @@ const en = {
   'common.high': 'High',
   'common.turn': '{{count}} turn',
   'common.turns': '{{count}} turns',
+  'common.person': '{{count}} person',
   'common.people': '{{count}} people',
   'time.hourShort': 'h',
   'time.minuteShort': 'm',
@@ -187,6 +188,18 @@ const en = {
     'Your selected states will be applied when the meeting connection starts.',
   'prejoin.start': 'Start meeting',
   'prejoin.enter': 'Enter meeting',
+  'devices.microphone': 'Microphone device',
+  'devices.noMicrophone': 'No microphone found',
+  'devices.microphoneFallback': 'Microphone {{count}}',
+  'devices.speaker': 'Speaker output',
+  'devices.speakerFallback': 'Speaker {{count}}',
+  'devices.systemSpeaker': 'System default — controlled by browser',
+  'devices.speakingLanguage': 'Speaking language',
+  'devices.permissionUnknown': 'Permission not requested',
+  'devices.permissionPrompt': 'Permission requested when testing',
+  'devices.permissionGranted': 'Microphone permission granted',
+  'devices.permissionDenied': 'Microphone permission blocked',
+  'devices.permissionOnUse': 'Permission checked when testing',
   'microphone.title': 'Microphone',
   'microphone.description':
     'Allow microphone access and verify the live input level.',
@@ -204,10 +217,22 @@ const en = {
   'microphone.statusComplete': 'Input detected. Test complete.',
   'microphone.statusNoInput':
     'No input detected. Check your microphone and try again.',
+  'microphone.statusPermissionDenied':
+    'Microphone permission was blocked. Update the browser permission and try again.',
+  'microphone.statusNoDevice':
+    'No microphone was found. Connect one and try again.',
+  'microphone.statusUnsupported':
+    'Microphone testing is not supported in this browser.',
   'microphone.statusError':
     'Microphone access failed. Check browser permission.',
   'microphone.levelAria': 'Live microphone input level',
   'microphone.roomNoise': 'Room noise',
+  'microphone.backgroundLevel': 'Estimated background level',
+  'microphone.backgroundEstimate':
+    'Estimated from the quietest part of this test.',
+  'microphone.notMeasured': 'Not measured',
+  'microphone.noiseWarning':
+    'Background noise is high. Move closer to the microphone or choose a quieter location.',
   'glossary.eyebrow': 'Terminology',
   'glossary.title': 'Business glossary',
   'glossary.description':
@@ -242,6 +267,14 @@ const en = {
   'meeting.noteDialogDescription':
     'Notes remain in this browser session and are included with the meeting state.',
   'meeting.keepOpen': 'Keep meeting open',
+  'meeting.endDialogTitle': 'End this meeting?',
+  'meeting.endDialogDescription':
+    'The live session will close and you will move to the meeting summary.',
+  'meeting.endDialogBody':
+    'Any transcript turns and notes recorded in this browser will remain available in the summary.',
+  'meeting.continueMeeting': 'Continue meeting',
+  'meeting.endMeeting': 'End meeting',
+  'meeting.ending': 'Ending meeting…',
   'meeting.addNote': 'Add note',
   'meeting.note': 'Note',
   'meeting.notePlaceholder': 'Capture a decision or follow-up…',
@@ -265,6 +298,8 @@ const en = {
     'Camera access failed. Check browser permission.',
   'stage.error.screen':
     'Screen sharing did not start.',
+  'stage.error.speaker':
+    'The selected speaker output is unavailable. Using the browser default.',
   'controls.microphone': 'Microphone',
   'controls.mute': 'Mute',
   'controls.unmute': 'Unmute',
@@ -287,9 +322,24 @@ const en = {
   'feed.autoHint':
     'Turn on your microphone and start speaking. Speech will be detected and translated automatically.',
   'feed.languageActive': '{{language}} active',
+  'feed.connectingTitle': 'Connecting translation',
+  'feed.connectingDescription':
+    'Wait until the realtime translation service is ready before expecting translated text.',
+  'feed.reconnectingTitle': 'Reconnecting translation',
+  'feed.reconnectingDescription':
+    'Meeting audio can continue, but new speech is not being translated yet.',
   'feed.readyTitle': 'Translation is ready',
   'feed.readyDescription':
     'Enable your microphone and start speaking to perform bilingual translation.',
+  'feed.pushReadyDescription':
+    'Hold Space or the microphone button when you are ready to speak.',
+  'feed.endedTitle': 'Translation session ended',
+  'feed.endedDescription':
+    'The meeting summary will open with the recorded transcript.',
+  'feed.errorTitle': 'Translation is unavailable',
+  'feed.errorDescription':
+    'The realtime translation service could not connect. Try again while the meeting stays open.',
+  'feed.retry': 'Try translation again',
   'feed.conversationTurns': 'Conversation turns',
   'feed.newTurn': 'New turn',
   'turn.original': 'Original · {{language}}',
@@ -337,11 +387,13 @@ const en = {
   'system.room': 'Room',
   'system.connection': 'Connection',
   'system.connecting': 'Connecting…',
+  'system.reconnecting': 'Reconnecting…',
   'system.gatewayConnected': 'Gateway connected',
   'system.sessionEnded': 'Session ended',
   'system.connectionIssue': 'Connection issue',
   'system.latency': 'Translation latency',
   'system.awaitingMetrics': 'Awaiting metrics',
+  'system.unavailable': 'Unavailable',
   'system.noise': 'Noise level',
   'system.mode': 'Translation mode',
   'system.realtimeGateway': 'Realtime gateway',
@@ -357,7 +409,12 @@ const en = {
   'summary.duration': 'Duration',
   'summary.conversationTurns': 'Conversation turns',
   'summary.languages': 'Languages',
+  'summary.dateTime': 'Date and time',
+  'summary.participants': 'Participants',
+  'summary.notRecorded': 'Not recorded',
   'summary.title': 'Summary',
+  'summary.localNotice':
+    'Prepared locally in this browser from the recorded transcript and meeting notes.',
   'summary.generatedOne':
     'The meeting “{{title}}” completed with 1 bilingual conversation turn.',
   'summary.generatedMany':
@@ -383,8 +440,15 @@ const en = {
   'summary.noDecisions': 'No decisions were recorded from notes. Add notes containing "decision" during the meeting to populate this.',
   'summary.notesSection': 'Meeting notes',
   'summary.noNotes': 'No notes were recorded during this meeting.',
+  'summary.noContentActions':
+    'Copy and download become available after a transcript turn or meeting note is recorded.',
+  'summary.noTranscriptAction':
+    'No transcript file is available because no translated turns were recorded.',
   'summary.copySuccess': 'Summary copied to clipboard.',
   'summary.copyFailed': 'Summary could not be copied.',
+  'summary.copyAction': 'Copy action item',
+  'summary.actionCopied': 'Action item copied',
+  'summary.actionCopyFailed': 'Action item could not be copied',
   'transcript.title': 'ViEnMeet bilingual transcript',
   'transcript.languages': 'Languages',
   'transcript.duration': 'Duration',
@@ -415,6 +479,7 @@ const vi = {
   'common.high': 'Cao',
   'common.turn': '{{count}} lượt',
   'common.turns': '{{count}} lượt',
+  'common.person': '{{count}} người',
   'common.people': '{{count}} người',
   'time.hourShort': 'giờ',
   'time.minuteShort': 'phút',
@@ -584,6 +649,18 @@ const vi = {
     'Trạng thái đã chọn sẽ được áp dụng khi bắt đầu kết nối cuộc họp.',
   'prejoin.start': 'Bắt đầu cuộc họp',
   'prejoin.enter': 'Vào phòng họp',
+  'devices.microphone': 'Thiết bị micro',
+  'devices.noMicrophone': 'Không tìm thấy micro',
+  'devices.microphoneFallback': 'Micro {{count}}',
+  'devices.speaker': 'Đầu ra loa',
+  'devices.speakerFallback': 'Loa {{count}}',
+  'devices.systemSpeaker': 'Loa mặc định — do trình duyệt quản lý',
+  'devices.speakingLanguage': 'Ngôn ngữ sẽ nói',
+  'devices.permissionUnknown': 'Chưa yêu cầu quyền micro',
+  'devices.permissionPrompt': 'Sẽ hỏi quyền khi kiểm tra',
+  'devices.permissionGranted': 'Đã cấp quyền micro',
+  'devices.permissionDenied': 'Quyền micro đang bị chặn',
+  'devices.permissionOnUse': 'Quyền được kiểm tra khi bắt đầu',
   'microphone.title': 'Micro',
   'microphone.description':
     'Cho phép truy cập micro và kiểm tra mức âm thanh đầu vào thực tế.',
@@ -601,10 +678,22 @@ const vi = {
   'microphone.statusComplete': 'Đã nhận đầu vào. Kiểm tra hoàn tất.',
   'microphone.statusNoInput':
     'Không nhận được âm thanh. Hãy kiểm tra micro rồi thử lại.',
+  'microphone.statusPermissionDenied':
+    'Quyền micro đã bị chặn. Hãy cập nhật quyền trình duyệt rồi thử lại.',
+  'microphone.statusNoDevice':
+    'Không tìm thấy micro. Hãy kết nối thiết bị rồi thử lại.',
+  'microphone.statusUnsupported':
+    'Trình duyệt này không hỗ trợ kiểm tra micro.',
   'microphone.statusError':
     'Không thể truy cập micro. Hãy kiểm tra quyền của trình duyệt.',
   'microphone.levelAria': 'Mức âm thanh đầu vào trực tiếp',
   'microphone.roomNoise': 'Tiếng ồn trong phòng',
+  'microphone.backgroundLevel': 'Mức âm nền ước tính',
+  'microphone.backgroundEstimate':
+    'Ước tính từ khoảng yên tĩnh nhất trong bài kiểm tra.',
+  'microphone.notMeasured': 'Chưa đo',
+  'microphone.noiseWarning':
+    'Âm nền đang cao. Hãy đặt micro gần hơn hoặc chuyển đến nơi yên tĩnh hơn.',
   'glossary.eyebrow': 'Thuật ngữ',
   'glossary.title': 'Bảng thuật ngữ kinh doanh',
   'glossary.description':
@@ -639,6 +728,14 @@ const vi = {
   'meeting.noteDialogDescription':
     'Ghi chú được giữ trong phiên trình duyệt này và lưu cùng trạng thái cuộc họp.',
   'meeting.keepOpen': 'Tiếp tục cuộc họp',
+  'meeting.endDialogTitle': 'Kết thúc cuộc họp này?',
+  'meeting.endDialogDescription':
+    'Phiên trực tiếp sẽ đóng và bạn sẽ chuyển đến phần tổng kết.',
+  'meeting.endDialogBody':
+    'Các lượt hội thoại và ghi chú đã lưu trong trình duyệt vẫn xuất hiện trong phần tổng kết.',
+  'meeting.continueMeeting': 'Tiếp tục cuộc họp',
+  'meeting.endMeeting': 'Kết thúc cuộc họp',
+  'meeting.ending': 'Đang kết thúc…',
   'meeting.addNote': 'Thêm ghi chú',
   'meeting.note': 'Ghi chú',
   'meeting.notePlaceholder': 'Ghi lại quyết định hoặc việc cần theo dõi…',
@@ -661,6 +758,8 @@ const vi = {
   'stage.error.camera':
     'Không thể truy cập camera. Hãy kiểm tra quyền trình duyệt.',
   'stage.error.screen': 'Không thể bắt đầu chia sẻ màn hình.',
+  'stage.error.speaker':
+    'Không thể dùng loa đã chọn. Trình duyệt sẽ dùng đầu ra mặc định.',
   'controls.microphone': 'Micro',
   'controls.mute': 'Tắt micro',
   'controls.unmute': 'Bật micro',
@@ -683,9 +782,24 @@ const vi = {
   'feed.autoHint':
     'Hãy bật micro và bắt đầu nói. Hệ thống sẽ tự động nhận diện và dịch.',
   'feed.languageActive': '{{language}} đang hoạt động',
+  'feed.connectingTitle': 'Đang kết nối dịch thuật',
+  'feed.connectingDescription':
+    'Hãy chờ dịch vụ dịch thời gian thực sẵn sàng trước khi bắt đầu theo dõi bản dịch.',
+  'feed.reconnectingTitle': 'Đang kết nối lại dịch thuật',
+  'feed.reconnectingDescription':
+    'Âm thanh cuộc họp vẫn có thể tiếp tục, nhưng lời nói mới chưa được dịch.',
   'feed.readyTitle': 'Bản dịch đã sẵn sàng',
   'feed.readyDescription':
     'Hãy bật micro và bắt đầu nói để thực hiện dịch thuật song ngữ.',
+  'feed.pushReadyDescription':
+    'Giữ phím Space hoặc nút micro khi bạn sẵn sàng nói.',
+  'feed.endedTitle': 'Phiên dịch đã kết thúc',
+  'feed.endedDescription':
+    'Phần tổng kết sẽ mở cùng biên bản đã ghi lại.',
+  'feed.errorTitle': 'Dịch thuật hiện không khả dụng',
+  'feed.errorDescription':
+    'Không thể kết nối dịch vụ dịch thời gian thực. Hãy thử lại trong khi cuộc họp vẫn mở.',
+  'feed.retry': 'Thử kết nối lại',
   'feed.conversationTurns': 'Các lượt hội thoại',
   'feed.newTurn': 'Lượt mới',
   'turn.original': 'Bản gốc · {{language}}',
@@ -733,11 +847,13 @@ const vi = {
   'system.room': 'Phòng',
   'system.connection': 'Kết nối',
   'system.connecting': 'Đang kết nối…',
+  'system.reconnecting': 'Đang kết nối lại…',
   'system.gatewayConnected': 'Đã kết nối cổng thời gian thực',
   'system.sessionEnded': 'Phiên đã kết thúc',
   'system.connectionIssue': 'Sự cố kết nối',
   'system.latency': 'Độ trễ dịch thuật',
   'system.awaitingMetrics': 'Đang chờ số liệu',
+  'system.unavailable': 'Không khả dụng',
   'system.noise': 'Mức tiếng ồn',
   'system.mode': 'Chế độ dịch',
   'system.realtimeGateway': 'Cổng thời gian thực',
@@ -753,7 +869,12 @@ const vi = {
   'summary.duration': 'Thời lượng',
   'summary.conversationTurns': 'Lượt hội thoại',
   'summary.languages': 'Ngôn ngữ',
+  'summary.dateTime': 'Ngày và giờ',
+  'summary.participants': 'Người tham gia',
+  'summary.notRecorded': 'Chưa ghi nhận',
   'summary.title': 'Tổng kết',
+  'summary.localNotice':
+    'Được tổng hợp cục bộ trong trình duyệt từ biên bản và ghi chú cuộc họp.',
   'summary.generatedOne':
     'Cuộc họp “{{title}}” đã kết thúc với 1 lượt hội thoại song ngữ.',
   'summary.generatedMany':
@@ -780,8 +901,15 @@ const vi = {
   'summary.noDecisions': 'Không có quyết định nào được ghi lại từ ghi chú. Hãy thêm ghi chú chứa từ "quyết định" hoặc "decision" trong cuộc họp.',
   'summary.notesSection': 'Ghi chú cuộc họp',
   'summary.noNotes': 'Không có ghi chú nào được ghi lại trong cuộc họp này.',
+  'summary.noContentActions':
+    'Tính năng sao chép và tải xuống sẽ khả dụng sau khi có lượt hội thoại hoặc ghi chú.',
+  'summary.noTranscriptAction':
+    'Chưa có tệp biên bản vì không ghi nhận được lượt dịch nào.',
   'summary.copySuccess': 'Đã sao chép phần tổng kết.',
   'summary.copyFailed': 'Không thể sao chép phần tổng kết.',
+  'summary.copyAction': 'Sao chép việc cần làm',
+  'summary.actionCopied': 'Đã sao chép việc cần làm',
+  'summary.actionCopyFailed': 'Không thể sao chép việc cần làm',
   'transcript.title': 'Biên bản song ngữ ViEnMeet',
   'transcript.languages': 'Ngôn ngữ',
   'transcript.duration': 'Thời lượng',

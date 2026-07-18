@@ -9,6 +9,7 @@ import {
   VideoTrack,
   isTrackReference,
   useLocalParticipant,
+  useRoomContext,
   useTrackRefContext,
   useTracks,
 } from '@livekit/components-react'
@@ -17,24 +18,36 @@ import { Track } from 'livekit-client'
 
 import { useTranslation } from '@/hooks/useTranslation'
 
-type MediaKind = 'microphone' | 'camera' | 'screen'
+type MediaKind = 'microphone' | 'camera' | 'screen' | 'speaker'
+
+export interface MeetingStageState {
+  hasRemoteParticipant: boolean
+  hasRemoteVideo: boolean
+}
 
 export interface LiveKitMeetingStageProps {
   microphoneEnabled: boolean
   cameraEnabled: boolean
   sharingEnabled: boolean
+  microphoneId: string
+  speakerId: string
   onMicrophoneTrackChange: (track: MediaStreamTrack | null) => void
   onMediaStateRejected: (kind: MediaKind) => void
+  onStageStateChange: (state: MeetingStageState) => void
 }
 
 export function LiveKitMeetingStage({
   microphoneEnabled,
   cameraEnabled,
   sharingEnabled,
+  microphoneId,
+  speakerId,
   onMicrophoneTrackChange,
   onMediaStateRejected,
+  onStageStateChange,
 }: LiveKitMeetingStageProps) {
   const { t } = useTranslation()
+  const room = useRoomContext()
   const {
     localParticipant,
     microphoneTrack,
@@ -49,6 +62,41 @@ export function LiveKitMeetingStage({
     ],
     { onlySubscribed: false },
   )
+  const hasRemoteParticipant = tracks.some(
+    (track) => !track.participant.isLocal,
+  )
+  const hasRemoteVideo = tracks.some(
+    (track) =>
+      !track.participant.isLocal &&
+      isTrackReference(track) &&
+      track.publication?.kind === Track.Kind.Video &&
+      !track.publication.isMuted &&
+      Boolean(track.publication.track),
+  )
+
+  useEffect(() => {
+    onStageStateChange({ hasRemoteParticipant, hasRemoteVideo })
+  }, [hasRemoteParticipant, hasRemoteVideo, onStageStateChange])
+
+  useEffect(() => {
+    if (!microphoneId) {
+      return
+    }
+
+    void room
+      .switchActiveDevice('audioinput', microphoneId)
+      .catch(() => onMediaStateRejected('microphone'))
+  }, [microphoneId, onMediaStateRejected, room])
+
+  useEffect(() => {
+    if (!speakerId) {
+      return
+    }
+
+    void room
+      .switchActiveDevice('audiooutput', speakerId)
+      .catch(() => onMediaStateRejected('speaker'))
+  }, [onMediaStateRejected, room, speakerId])
 
   useEffect(() => {
     if (isMicrophoneEnabled === microphoneEnabled) {

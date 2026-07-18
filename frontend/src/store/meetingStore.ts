@@ -41,6 +41,7 @@ export interface MeetingStoreActions {
   setLocalLanguage: (language: Language) => void
   setConversationMode: (mode: ConversationMode) => void
   setMicrophone: (microphoneId: string) => void
+  setSpeaker: (speakerId: string) => void
   setMicrophoneEnabled: (enabled: boolean) => void
   toggleMicrophone: () => void
   setCameraEnabled: (enabled: boolean) => void
@@ -100,7 +101,7 @@ const createInitialStoreState = (): MeetingStoreState => ({
   cameraEnabled: false,
   microphoneTestStatus: 'idle',
   audioInputLevel: 0,
-  noiseLevel: 'low',
+  noiseLevel: 'unknown',
   activeTurnId: null,
   realtimeSession: {
     clientId: getOrCreateClientId(),
@@ -229,6 +230,15 @@ export const useMeetingStore = create<MeetingStore>()((set) => ({
       meeting: {
         ...state.meeting,
         microphoneId,
+      },
+    }))
+  },
+
+  setSpeaker: (speakerId) => {
+    set((state) => ({
+      meeting: {
+        ...state.meeting,
+        speakerId,
       },
     }))
   },
@@ -499,6 +509,7 @@ export const useMeetingStore = create<MeetingStore>()((set) => ({
       cameraEnabled: false,
       microphoneTestStatus: 'idle',
       audioInputLevel: 0,
+      noiseLevel: 'unknown',
       activeTurnId: null,
       realtimeSession: {
         ...state.realtimeSession,

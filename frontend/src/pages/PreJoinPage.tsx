@@ -7,6 +7,7 @@ import { MicrophoneTest } from '@/components/setup/MicrophoneTest'
 import { PreJoinDeviceSetup } from '@/components/setup/PreJoinDeviceSetup'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import { useMediaDevices } from '@/hooks/useMediaDevices'
 import { useRoomSession } from '@/hooks/useRoomSession'
 import { useTranslation } from '@/hooks/useTranslation'
 import { ROUTES } from '@/lib/constants'
@@ -21,6 +22,7 @@ export default function PreJoinPage() {
   const microphoneEnabled = useMeetingStore(
     (state) => state.microphoneEnabled,
   )
+  const mediaDevices = useMediaDevices()
   const startMeeting = useMeetingStore((state) => state.startMeeting)
   const isJoining = searchParams.get('join') === '1'
   const setupRoute = isJoining
@@ -73,7 +75,7 @@ export default function PreJoinPage() {
         id="prejoin-main"
         className="mx-auto w-full max-w-5xl px-4 pb-12 pt-8 sm:px-6 sm:pb-16 sm:pt-11 lg:px-8"
       >
-        <div className="mb-8 flex flex-col gap-2 border-b border-line pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-8 flex flex-col gap-5 border-b border-line pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
               {t('prejoin.room')}
@@ -81,37 +83,36 @@ export default function PreJoinPage() {
             <p className="mt-1 truncate text-lg font-semibold text-ink">
               {meeting.title || roomId}
             </p>
+            <p className="mt-1 text-xs font-medium text-muted">
+              {roomId}
+            </p>
           </div>
-          <span className="shrink-0 text-xs font-medium text-muted">
-            {roomId}
-          </span>
+          <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:items-end">
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              trailingIcon={
+                <ArrowRight aria-hidden="true" className="size-4" />
+              }
+              onClick={handleEnterMeeting}
+              className="sm:w-auto"
+            >
+              {t(isJoining ? 'prejoin.enter' : 'prejoin.start')}
+            </Button>
+            <p className="max-w-sm text-xs leading-5 text-muted sm:text-right">
+              {t('prejoin.connectionNote')}
+            </p>
+          </div>
         </div>
 
-        <PreJoinDeviceSetup />
+        <PreJoinDeviceSetup mediaDevices={mediaDevices} />
 
         {microphoneEnabled && (
           <div className="mt-8">
-            <MicrophoneTest />
+            <MicrophoneTest mediaDevices={mediaDevices} />
           </div>
         )}
-
-        <div className="mt-10 flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="max-w-xl text-xs leading-5 text-muted">
-            {t('prejoin.connectionNote')}
-          </p>
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            trailingIcon={
-              <ArrowRight aria-hidden="true" className="size-4" />
-            }
-            onClick={handleEnterMeeting}
-            className="sm:w-auto"
-          >
-            {t(isJoining ? 'prejoin.enter' : 'prejoin.start')}
-          </Button>
-        </div>
       </main>
     </div>
   )
