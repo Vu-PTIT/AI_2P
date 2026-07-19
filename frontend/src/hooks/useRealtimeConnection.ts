@@ -57,7 +57,9 @@ export function useRealtimeConnection({
     status: meetingStatus,
     title,
     localLanguage,
+    languageOrder,
     participants,
+    glossary,
   } = meeting
   const { clientId } = realtimeSession
   const gatewayReady =
@@ -68,11 +70,18 @@ export function useRealtimeConnection({
     )?.name ?? clientId
 
   useEffect(() => {
+    const socket = socketRef.current
+    if (socket?.connected && gatewayReady) {
+      socket.emit('session.glossary', { glossary })
+    }
+  }, [glossary, gatewayReady])
+
+  useEffect(() => {
     if (meetingStatus !== 'live') {
       return
     }
 
-    const query = {
+    const query: RealtimeConnectionQuery = {
       sessionId: roomId,
       clientId,
       domain: 'business',
@@ -80,7 +89,8 @@ export function useRealtimeConnection({
       title,
       displayName,
       localLanguage,
-    } satisfies RealtimeConnectionQuery
+      glossary: JSON.stringify(glossary),
+    }
 
     const socket = io(`${SOCKET_URL}/audio`, {
       query,
@@ -151,6 +161,26 @@ export function useRealtimeConnection({
       const event = parseTranslateDone(value)
       if (event) {
         applyRealtimeEvent(event)
+      }
+    })
+    socket.on('summary.partial', (value: unknown) => {
+      if (
+        value &&
+        typeof value === 'object' &&
+        'summary' in value &&
+        typeof value.summary === 'string'
+      ) {
+        useMeetingStore.getState().setAiSummary(value.summary, 'streaming')
+      }
+    })
+    socket.on('summary.done', (value: unknown) => {
+      if (
+        value &&
+        typeof value === 'object' &&
+        'summary' in value &&
+        typeof value.summary === 'string'
+      ) {
+        useMeetingStore.getState().setAiSummary(value.summary, 'done')
       }
     })
 
@@ -234,6 +264,15 @@ export function useRealtimeConnection({
     setRealtimeStatus,
     title,
   ])
+
+  const activeSpeaker = languageOrder[0]
+
+  useEffect(() => {
+    const socket = socketRef.current
+    if (meetingStatus === 'live' && gatewayReady && socket?.connected) {
+      socket.emit('speaker.switch', { speaker: activeSpeaker })
+    }
+  }, [activeSpeaker, gatewayReady, meetingStatus])
 
   useEffect(() => {
     const canStream =

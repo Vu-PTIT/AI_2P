@@ -125,10 +125,29 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
         previousSocket.disconnect(true);
       }
 
+      let glossary: Array<{ original: string; preferred: string; notes?: string }> | undefined;
+      try {
+        if (typeof client.handshake.query?.glossary === 'string') {
+          const parsed = JSON.parse(client.handshake.query.glossary);
+          if (Array.isArray(parsed)) {
+            glossary = parsed
+              .map((item: any) => ({
+                original: String(item?.original || '').trim(),
+                preferred: String(item?.preferred || '').trim(),
+                notes: item?.notes ? String(item.notes).trim() : undefined,
+              }))
+              .filter((item) => item.original && item.preferred);
+          }
+        }
+      } catch {
+        // ignore invalid JSON
+      }
+
       await this.aiBridge.openSession(sessionId, clientId, {
         domain,
         languagePair,
         speaker: language ?? 'vi',
+        glossary,
       });
 
       if (
@@ -245,6 +264,37 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  @SubscribeMessage('session.glossary')
+  onSessionGlossary(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { glossary?: Array<{ original: string; preferred: string; notes?: string }> },
+  ): void {
+    const { sessionId, clientId } = getSocketData(client);
+    if (!sessionId || !clientId) return;
+
+    if (
+      !this.sessionStore.isLive(sessionId) ||
+      !this.sessionStore.isCurrentClient(sessionId, clientId, client.id) ||
+      !body?.glossary ||
+      !Array.isArray(body.glossary)
+    ) {
+      return;
+    }
+
+    const cleanGlossary = body.glossary
+      .map((item: any) => ({
+        original: String(item?.original || '').trim(),
+        preferred: String(item?.preferred || '').trim(),
+        notes: item?.notes ? String(item.notes).trim() : undefined,
+      }))
+      .filter((item) => item.original && item.preferred);
+
+    this.aiBridge.sendControl(sessionId, clientId, {
+      type: 'session.glossary',
+      glossary: cleanGlossary,
+    });
+  }
+
   @SubscribeMessage('session.end')
   onSessionEnd(@ConnectedSocket() client: Socket): void {
     const { sessionId, clientId } = getSocketData(client);
@@ -262,10 +312,38 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.in(sessionId).disconnectSockets(true);
   }
 
+  @SubscribeMessage('session.summarize')
+  onSessionSummarize(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body?: { title?: string; turns?: unknown[]; notes?: unknown[] },
+  ): void {
+    const { sessionId, clientId } = getSocketData(client);
+    if (!sessionId || !clientId) return;
+
+    const snapshot = this.sessionStore.getPublicSnapshot(sessionId);
+    const title = body?.title || (snapshot.exists ? snapshot.title : 'Cuộc họp');
+    const turns = Array.isArray(body?.turns) ? body.turns : [];
+    const notes = Array.isArray(body?.notes) ? body.notes : [];
+
+    this.aiBridge.sendControl(sessionId, clientId, {
+      type: 'session.summarize',
+      title,
+      turns,
+      notes,
+    });
+  }
+
   @OnEvent('ai.event')
   handleAiEvent(payload: AiEventPayload): void {
     const { sessionId, clientId, ...event } = payload;
-    if (!this.sessionStore.isLive(sessionId)) return;
+    if (
+      !this.sessionStore.isLive(sessionId) &&
+      event.type !== 'summary.partial' &&
+      event.type !== 'summary.done' &&
+      event.type !== 'error'
+    ) {
+      return;
+    }
     const clientMetadata = this.sessionStore.getClientMetadata(
       sessionId,
       clientId,

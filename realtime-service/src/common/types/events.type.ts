@@ -54,6 +54,18 @@ export type TranslateDoneEvent = {
   utteranceId: string;
 };
 
+export type SummaryPartialEvent = {
+  type: 'summary.partial';
+  summary: string;
+  clientId: string;
+};
+
+export type SummaryDoneEvent = {
+  type: 'summary.done';
+  summary: string;
+  clientId: string;
+};
+
 export type ErrorEvent = {
   type: 'error';
   code: string;
@@ -67,6 +79,8 @@ export type AiEvent =
   | TranslatePartialEvent
   | TranslateTokenEvent
   | TranslateDoneEvent
+  | SummaryPartialEvent
+  | SummaryDoneEvent
   | ErrorEvent;
 
 export type AiWorkerEvent =
@@ -75,6 +89,8 @@ export type AiWorkerEvent =
   | Omit<TranslatePartialEvent, 'clientId'>
   | Omit<TranslateTokenEvent, 'clientId'>
   | Omit<TranslateDoneEvent, 'clientId'>
+  | Omit<SummaryPartialEvent, 'clientId'>
+  | Omit<SummaryDoneEvent, 'clientId'>
   | Omit<ErrorEvent, 'clientId'>;
 
 type WithPipelineContext<T> = T extends unknown

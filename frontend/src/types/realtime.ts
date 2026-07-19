@@ -110,6 +110,7 @@ export interface RealtimeConnectionQuery {
   title: string
   displayName: string
   localLanguage: Language
+  glossary?: string
 }
 
 export interface SpeakerSwitchCommand {
