@@ -30,6 +30,7 @@ export interface LiveKitMeetingStageProps {
   cameraEnabled: boolean
   sharingEnabled: boolean
   microphoneId: string
+  cameraId: string
   speakerId: string
   onMicrophoneTrackChange: (track: MediaStreamTrack | null) => void
   onMediaStateRejected: (kind: MediaKind) => void
@@ -41,6 +42,7 @@ export function LiveKitMeetingStage({
   cameraEnabled,
   sharingEnabled,
   microphoneId,
+  cameraId,
   speakerId,
   onMicrophoneTrackChange,
   onMediaStateRejected,
@@ -97,6 +99,16 @@ export function LiveKitMeetingStage({
       .switchActiveDevice('audiooutput', speakerId)
       .catch(() => onMediaStateRejected('speaker'))
   }, [onMediaStateRejected, room, speakerId])
+
+  useEffect(() => {
+    if (!cameraId) {
+      return
+    }
+
+    void room
+      .switchActiveDevice('videoinput', cameraId)
+      .catch(() => onMediaStateRejected('camera'))
+  }, [cameraId, onMediaStateRejected, room])
 
   useEffect(() => {
     if (isMicrophoneEnabled === microphoneEnabled) {

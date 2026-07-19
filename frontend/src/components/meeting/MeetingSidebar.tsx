@@ -5,6 +5,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import {
+  Activity,
   BookOpen,
   FileText,
   Plus,
@@ -21,7 +22,7 @@ import { cn } from '@/lib/utils'
 import { useMeetingStore } from '@/store/meetingStore'
 import { SystemStatus } from './SystemStatus'
 
-type SidebarTab = 'participants' | 'glossary' | 'notes'
+type SidebarTab = 'participants' | 'glossary' | 'notes' | 'system'
 
 export interface MeetingSidebarProps {
   className?: string
@@ -36,6 +37,7 @@ const tabs = [
   },
   { id: 'glossary', labelKey: 'sidebar.glossary', icon: BookOpen },
   { id: 'notes', labelKey: 'sidebar.notes', icon: FileText },
+  { id: 'system', labelKey: 'sidebar.system', icon: Activity },
 ] as const satisfies readonly {
   id: SidebarTab
   labelKey: TranslationKey
@@ -68,9 +70,9 @@ export function MeetingSidebar({
   ) => {
     let nextIndex: number | null = null
 
-    if (event.key === 'ArrowRight') {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
       nextIndex = (tabIndex + 1) % tabs.length
-    } else if (event.key === 'ArrowLeft') {
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
       nextIndex = (tabIndex - 1 + tabs.length) % tabs.length
     } else if (event.key === 'Home') {
       nextIndex = 0
@@ -114,7 +116,7 @@ export function MeetingSidebar({
   return (
     <aside
       className={cn(
-        'flex min-h-0 flex-col border-l border-line bg-panel',
+        'grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-panel md:grid-cols-[12rem_minmax(0,1fr)] md:grid-rows-1',
         className,
       )}
       aria-label={t('sidebar.ariaLabel')}
@@ -123,7 +125,7 @@ export function MeetingSidebar({
         id={tabListId}
         role="tablist"
         aria-label={t('sidebar.sections')}
-        className="grid grid-cols-3 border-b border-line"
+        className="grid grid-cols-4 border-b border-line bg-panel md:flex md:flex-col md:gap-1 md:border-b-0 md:border-r md:bg-panel-muted/45 md:p-3"
       >
         {tabs.map((tab, tabIndex) => {
           const Icon = tab.icon
@@ -142,17 +144,17 @@ export function MeetingSidebar({
                 handleTabKeyDown(event, tabIndex)
               }
               className={cn(
-                'relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[0.6875rem] font-semibold transition-colors',
+                'relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[0.625rem] font-semibold transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary sm:text-[0.6875rem] md:min-h-11 md:flex-row md:justify-start md:gap-2.5 md:rounded-[9px] md:px-3 md:text-xs',
                 selected
-                  ? 'text-ink'
-                  : 'text-muted hover:bg-panel/60 hover:text-muted-strong',
+                  ? 'text-primary md:bg-panel md:text-ink md:shadow-[0_1px_2px_rgb(16_24_40/0.06)]'
+                  : 'text-muted hover:bg-panel-raised hover:text-muted-strong',
               )}
             >
               <Icon className="size-4" aria-hidden="true" />
               {t(tab.labelKey)}
               {selected && (
                 <span
-                  className="absolute inset-x-3 bottom-0 h-0.5 bg-primary"
+                  className="absolute inset-x-3 bottom-0 h-0.5 bg-primary md:inset-y-2 md:left-0 md:right-auto md:h-auto md:w-0.5 md:rounded-full"
                   aria-hidden="true"
                 />
               )}
@@ -161,7 +163,7 @@ export function MeetingSidebar({
         })}
       </div>
 
-      <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div className="scrollbar-subtle min-h-0 overflow-y-auto px-4 py-4 sm:px-5 md:px-6 md:py-5">
         {activeTab === 'participants' && (
           <div
             role="tabpanel"
@@ -187,7 +189,7 @@ export function MeetingSidebar({
             {connectedParticipants.map((participant) => (
               <div
                 key={participant.id}
-                className="flex items-center gap-3 rounded-lg border border-line bg-panel px-3 py-3"
+                className="flex items-center gap-3 border-b border-line py-3 first:border-t"
               >
                 <div
                   className={cn(
@@ -332,8 +334,25 @@ export function MeetingSidebar({
             </div>
           </div>
         )}
+
+        {activeTab === 'system' && (
+          <div
+            role="tabpanel"
+            id={`${tabListId}-system`}
+            aria-labelledby={`${tabListId}-system-tab`}
+          >
+            <div className="mb-5">
+              <h2 className="text-sm font-bold text-ink">
+                {t('system.title')}
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                {t('sidebar.systemDescription')}
+              </p>
+            </div>
+            <SystemStatus embedded />
+          </div>
+        )}
       </div>
-      <SystemStatus />
     </aside>
   )
 }

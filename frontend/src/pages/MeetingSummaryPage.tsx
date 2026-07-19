@@ -1,4 +1,11 @@
-import { useEffect } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
 import {
   ArrowRight,
   CalendarClock,
@@ -36,12 +43,19 @@ import {
   createTranscriptFileName,
   createTranscriptText,
 } from '@/lib/transcript'
+import { cn } from '@/lib/utils'
 import { useMeetingStore } from '@/store/meetingStore'
 import type { ActionItem } from '@/types/meeting'
+
+type SummaryTab = 'summary' | 'transcript'
 
 export default function MeetingSummaryPage() {
   const navigate = useNavigate()
   const { locale, t } = useTranslation()
+  const [activeTab, setActiveTab] = useState<SummaryTab>('summary')
+  const [showCompactOverview, setShowCompactOverview] = useState(false)
+  const tabListId = useId()
+  const overviewRef = useRef<HTMLDivElement>(null)
   useRoomSession()
   const meeting = useMeetingStore((state) => state.meeting)
   const prepareAnotherMeeting = useMeetingStore(
@@ -72,7 +86,27 @@ export default function MeetingSummaryPage() {
   const aiSummary = meeting.aiSummary
   const aiSummaryStatus = meeting.aiSummaryStatus || 'idle'
 
-  const startAiSummaryGeneration = async () => {
+  useEffect(() => {
+    const overview = overviewRef.current
+    if (!overview) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const hasScrolledPastOverview =
+          !entry.isIntersecting && entry.boundingClientRect.bottom <= 64
+        setShowCompactOverview(hasScrolledPastOverview)
+      },
+      {
+        rootMargin: '-64px 0px 0px',
+        threshold: 0,
+      },
+    )
+
+    observer.observe(overview)
+    return () => observer.disconnect()
+  }, [])
+
+  const startAiSummaryGeneration = useCallback(async () => {
     if (!hasSummaryContent) return
     setAiSummary('', 'loading')
     try {
@@ -109,16 +143,23 @@ export default function MeetingSummaryPage() {
               } else if (data.type === 'error') {
                 setAiSummaryStatus('error')
               }
-            } catch (e) {
+            } catch {
               // ignore malformed lines
             }
           }
         }
       }
-    } catch (error) {
+    } catch {
       setAiSummaryStatus('error')
     }
-  }
+  }, [
+    hasSummaryContent,
+    meeting.notes,
+    meeting.title,
+    meeting.turns,
+    setAiSummary,
+    setAiSummaryStatus,
+  ])
 
   useEffect(() => {
     if (
@@ -128,9 +169,14 @@ export default function MeetingSummaryPage() {
     ) {
       startAiSummaryGeneration()
     }
-  }, [hasSummaryContent, meeting.aiSummaryStatus, meeting.aiSummary])
+  }, [
+    hasSummaryContent,
+    meeting.aiSummaryStatus,
+    meeting.aiSummary,
+    startAiSummaryGeneration,
+  ])
 
-  let summaryText = ''
+  let summaryText: string
   let actionItems: ActionItem[]
   let decisions: string[]
 
@@ -257,6 +303,49 @@ export default function MeetingSummaryPage() {
     })
   }
 
+  const copyableSummary = (aiSummary ?? '').trim() || summaryText
+  const summaryTabs = [
+    {
+      id: 'summary',
+      label: t('summary.summaryTab'),
+      icon: Clipboard,
+    },
+    {
+      id: 'transcript',
+      label: t('summary.transcriptTab'),
+      icon: Languages,
+    },
+  ] as const
+
+  const handleTabKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    tabIndex: number,
+  ) => {
+    let nextIndex: number | null = null
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (tabIndex + 1) % summaryTabs.length
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex =
+        (tabIndex - 1 + summaryTabs.length) % summaryTabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = summaryTabs.length - 1
+    }
+
+    if (nextIndex === null) return
+
+    event.preventDefault()
+    const nextTab = summaryTabs[nextIndex]
+    setActiveTab(nextTab.id)
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`${tabListId}-${nextTab.id}-tab`)
+        ?.focus()
+    })
+  }
+
   const downloadTranscript = () => {
     const exportMeeting = {
       ...meeting,
@@ -292,7 +381,7 @@ export default function MeetingSummaryPage() {
         {t('summary.skip')}
       </a>
 
-      <header className="border-b border-line bg-canvas-deep">
+      <header className="sticky top-0 z-50 border-b border-line bg-canvas-deep">
         <div className="mx-auto flex min-h-16 max-w-[1240px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <BrandMark to="/" />
           <div className="flex items-center gap-2">
@@ -302,16 +391,44 @@ export default function MeetingSummaryPage() {
         </div>
       </header>
 
+      <div
+        aria-hidden="true"
+        className={cn(
+          'pointer-events-none fixed inset-x-0 top-16 z-40 border-b border-line bg-canvas-deep transition-[transform,opacity] duration-200 ease-[var(--ease-out-expo)]',
+          showCompactOverview
+            ? 'translate-y-0 opacity-100'
+            : '-translate-y-full opacity-0',
+        )}
+      >
+        <div className="mx-auto flex min-h-14 max-w-[1240px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <div className="min-w-0">
+            <p className="text-[0.625rem] font-bold uppercase tracking-[0.12em] text-primary">
+              {t('summary.eyebrow')}
+            </p>
+            <p className="mt-0.5 truncate text-sm font-bold tracking-[-0.01em] text-ink sm:text-base">
+              {meeting.title}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 text-xs font-semibold text-muted-strong">
+            <CalendarClock className="size-4 text-muted" />
+            <span>{dateTimeLabel}</span>
+          </div>
+        </div>
+      </div>
+
       <main
         id="summary-content"
-        className="mx-auto max-w-[1240px] px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-16"
+        className="mx-auto max-w-[1240px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10"
       >
-        <div className="flex flex-col gap-7 border-b border-line pb-9 lg:flex-row lg:items-end lg:justify-between">
+        <div
+          ref={overviewRef}
+          className="flex flex-col gap-5 border-b border-line pb-6 lg:flex-row lg:items-end lg:justify-between"
+        >
           <div className="max-w-3xl">
             <p className="text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-primary">
               {t('summary.eyebrow')}
             </p>
-            <h1 className="mt-3 text-balance text-[clamp(2rem,5vw,3.5rem)] font-semibold leading-[1.05] tracking-[-0.05em] text-ink">
+            <h1 className="mt-2 text-balance text-[clamp(1.875rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.045em] text-ink">
               {meeting.title}
             </h1>
           </div>
@@ -326,7 +443,7 @@ export default function MeetingSummaryPage() {
                     <Copy className="size-4" aria-hidden="true" />
                   )
                 }
-                onClick={() => void copy(summaryText)}
+                onClick={() => void copy(copyableSummary)}
                 disabled={!hasSummaryContent}
                 aria-describedby={
                   hasSummaryContent ? undefined : 'summary-actions-support'
@@ -375,7 +492,7 @@ export default function MeetingSummaryPage() {
           </div>
         </div>
 
-        <dl className="grid border-b border-line sm:grid-cols-2 lg:grid-cols-[0.8fr_0.8fr_1fr_1.4fr_1.8fr]">
+        <dl className="grid grid-cols-2 border-b border-line lg:grid-cols-[0.8fr_0.8fr_1fr_1.4fr_1.8fr]">
           <MetadataItem
             icon={<Timer className="size-4" aria-hidden="true" />}
             label={t('summary.duration')}
@@ -403,215 +520,286 @@ export default function MeetingSummaryPage() {
           />
         </dl>
 
-        <div className="grid gap-6 py-10 lg:grid-cols-[minmax(0,1.7fr)_minmax(20rem,1fr)] lg:py-14">
-          <section
-            aria-labelledby="summary-heading"
-            className="rounded-[14px] border border-line-strong bg-panel px-5 py-6 shadow-[0_8px_24px_rgb(16_24_40/0.04)] sm:px-7 sm:py-8"
-          >
-            <div className="flex items-center justify-between gap-2 border-b border-line pb-4">
-              <div className="flex items-center gap-2 text-primary">
-                <Clipboard className="size-4" aria-hidden="true" />
-                <h2
-                  id="summary-heading"
-                  className="text-xs font-bold uppercase tracking-[0.12em]"
-                >
-                  {t('summary.title')} (FPT AI Model)
-                </h2>
+        <div className="grid gap-7 py-6 lg:grid-cols-[12.5rem_minmax(0,1fr)] lg:gap-10 lg:py-8">
+          <nav className="min-w-0" aria-label={t('summary.tabsLabel')}>
+            <div className="lg:sticky lg:top-[8rem]">
+              <p className="hidden text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-muted lg:block">
+                {t('summary.detailLabel')}
+              </p>
+              <div
+                id={tabListId}
+                role="tablist"
+                aria-label={t('summary.tabsLabel')}
+                className="grid grid-cols-2 gap-1 rounded-xl bg-panel-raised p-1 lg:mt-3 lg:grid-cols-1 lg:rounded-none lg:bg-transparent lg:p-0"
+              >
+                {summaryTabs.map((tab, tabIndex) => {
+                  const Icon = tab.icon
+                  const selected = activeTab === tab.id
+
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      id={`${tabListId}-${tab.id}-tab`}
+                      aria-controls={`${tabListId}-${tab.id}-panel`}
+                      aria-selected={selected}
+                      tabIndex={selected ? 0 : -1}
+                      onClick={() => setActiveTab(tab.id)}
+                      onKeyDown={(event) =>
+                        handleTabKeyDown(event, tabIndex)
+                      }
+                      className={cn(
+                        'flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:justify-start',
+                        selected
+                          ? 'bg-panel text-ink shadow-[0_1px_3px_rgb(16_24_40/0.1)] lg:bg-panel-raised lg:shadow-none'
+                          : 'text-muted hover:bg-panel hover:text-muted-strong lg:hover:bg-panel-raised',
+                      )}
+                    >
+                      <Icon className="size-4" aria-hidden="true" />
+                      {tab.label}
+                    </button>
+                  )
+                })}
               </div>
-              {hasSummaryContent && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={startAiSummaryGeneration}
-                  disabled={
-                    aiSummaryStatus === 'loading' ||
-                    aiSummaryStatus === 'streaming'
-                  }
-                  className="h-8 gap-1.5 text-xs"
-                >
-                  <RotateCcw className="size-3.5" />
-                  {aiSummaryStatus === 'loading' ||
-                  aiSummaryStatus === 'streaming'
-                    ? 'Đang tạo tóm tắt...'
-                    : 'Tạo lại bằng AI'}
-                </Button>
-              )}
             </div>
-            <div className="mt-5">
-              {aiSummaryStatus === 'loading' && !aiSummary ? (
-                <div className="flex flex-col gap-3 py-6">
-                  <div className="flex items-center gap-2 text-sm font-medium text-primary animate-pulse">
-                    <span className="size-2 rounded-full bg-primary animate-ping" />
-                    Đang gọi FPT AI Model để tóm tắt cuộc họp...
-                  </div>
-                  <div className="h-4 w-3/4 rounded bg-panel-hover animate-pulse" />
-                  <div className="h-4 w-1/2 rounded bg-panel-hover animate-pulse" />
-                  <div className="h-4 w-5/6 rounded bg-panel-hover animate-pulse" />
+          </nav>
+
+          <div className="min-w-0">
+            {activeTab === 'summary' && (
+              <div
+                role="tabpanel"
+                id={`${tabListId}-summary-panel`}
+                aria-labelledby={`${tabListId}-summary-tab`}
+              >
+                <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]">
+                  <section
+                    aria-labelledby="summary-heading"
+                    className="rounded-[14px] border border-line-strong bg-panel px-5 py-6 shadow-[0_8px_24px_rgb(16_24_40/0.04)] sm:px-7 sm:py-8"
+                  >
+                    <div className="flex flex-col gap-3 border-b border-line pb-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2 text-primary">
+                        <Clipboard
+                          className="size-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <h2
+                          id="summary-heading"
+                          className="text-xs font-bold uppercase tracking-[0.12em]"
+                        >
+                          {t('summary.title')} · {t('summary.aiModel')}
+                        </h2>
+                      </div>
+                      {hasSummaryContent && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={startAiSummaryGeneration}
+                          disabled={
+                            aiSummaryStatus === 'loading' ||
+                            aiSummaryStatus === 'streaming'
+                          }
+                          className="h-9 gap-1.5 self-start text-xs sm:self-auto"
+                        >
+                          <RotateCcw
+                            className="size-3.5"
+                            aria-hidden="true"
+                          />
+                          {aiSummaryStatus === 'loading' ||
+                          aiSummaryStatus === 'streaming'
+                            ? t('summary.generating')
+                            : t('summary.regenerateAi')}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="mt-6">
+                      {aiSummaryStatus === 'loading' && !aiSummary ? (
+                        <div className="flex flex-col gap-3 py-6">
+                          <div className="flex items-center gap-2 text-sm font-medium text-primary animate-pulse">
+                            <span
+                              className="size-2 rounded-full bg-primary animate-ping"
+                              aria-hidden="true"
+                            />
+                            {t('summary.generatingDescription')}
+                          </div>
+                          <div className="h-4 w-3/4 rounded bg-panel-hover animate-pulse" />
+                          <div className="h-4 w-1/2 rounded bg-panel-hover animate-pulse" />
+                          <div className="h-4 w-5/6 rounded bg-panel-hover animate-pulse" />
+                        </div>
+                      ) : aiSummary ? (
+                        <FormattedAiSummary
+                          content={aiSummary}
+                          isStreaming={aiSummaryStatus === 'streaming'}
+                        />
+                      ) : (
+                        <p className="max-w-[70ch] break-words text-base leading-8 text-ink-soft sm:text-lg">
+                          {summaryText}
+                        </p>
+                      )}
+                    </div>
+                    {hasSummaryContent && !aiSummary && (
+                      <p className="mt-4 max-w-[70ch] text-xs leading-5 text-muted">
+                        {t('summary.localNotice')}
+                      </p>
+                    )}
+                  </section>
+
+                  <section
+                    aria-labelledby="actions-heading"
+                    className="self-start rounded-[14px] border border-line bg-panel px-5 py-6 sm:px-6"
+                  >
+                    <h2
+                      id="actions-heading"
+                      className="text-sm font-bold text-ink"
+                    >
+                      {t('summary.actionItems')}
+                    </h2>
+                    {actionItems.length === 0 ? (
+                      <p className="mt-4 text-xs leading-relaxed text-muted">
+                        {t('summary.noActionItems')}
+                      </p>
+                    ) : (
+                      <ol className="mt-4 divide-y divide-line">
+                        {actionItems.map((item, index) => (
+                          <ActionItemRow
+                            key={item.id}
+                            item={item}
+                            index={index}
+                          />
+                        ))}
+                      </ol>
+                    )}
+                  </section>
                 </div>
-              ) : aiSummary ? (
-                <FormattedAiSummary
-                  content={aiSummary}
-                  isStreaming={aiSummaryStatus === 'streaming'}
-                />
-              ) : (
-                <p className="max-w-[70ch] break-words text-base leading-8 text-ink-soft sm:text-lg">
-                  {summaryText}
-                </p>
-              )}
-            </div>
-            {hasSummaryContent && !aiSummary && (
-              <p className="mt-4 max-w-[70ch] text-xs leading-5 text-muted">
-                {t('summary.localNotice')}
-              </p>
-            )}
-          </section>
 
-          <section
-            aria-labelledby="actions-heading"
-            className="rounded-[14px] border border-line bg-panel px-5 py-6 sm:px-6"
-          >
-            <h2
-              id="actions-heading"
-              className="text-sm font-bold text-ink"
-            >
-              {t('summary.actionItems')}
-            </h2>
-            {actionItems.length === 0 ? (
-              <p className="mt-4 text-xs text-muted leading-relaxed">
-                {t('summary.noActionItems')}
-              </p>
-            ) : (
-              <ol className="mt-4 divide-y divide-line">
-                {actionItems.map((item, index) => (
-                  <ActionItemRow
-                    key={item.id}
-                    item={item}
-                    index={index}
-                  />
-                ))}
-              </ol>
+                <section
+                  aria-labelledby="decisions-heading"
+                  className="mt-6 border-y border-line py-8"
+                >
+                  <div className="grid gap-6 xl:grid-cols-[13rem_1fr]">
+                    <div>
+                      <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-muted">
+                        {t('summary.alignedOutcomes')}
+                      </p>
+                      <h2
+                        id="decisions-heading"
+                        className="mt-2 text-xl font-bold tracking-[-0.025em]"
+                      >
+                        {t('summary.decisions')}
+                      </h2>
+                    </div>
+                    {decisions.length === 0 ? (
+                      <p className="text-xs leading-5 text-muted xl:pl-4">
+                        {t('summary.noDecisions')}
+                      </p>
+                    ) : (
+                      <ol className="grid gap-3 sm:grid-cols-2">
+                        {decisions.map((decision, index) => (
+                          <li
+                            key={`${decision}-${index}`}
+                            className="flex min-w-0 gap-4 break-words border-l border-line-strong pl-4 text-sm leading-6 text-ink-soft"
+                          >
+                            <span className="font-bold text-primary">
+                              {String(index + 1).padStart(2, '0')}
+                            </span>
+                            {decision}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                </section>
+
+                <section
+                  aria-labelledby="notes-heading"
+                  className="border-b border-line py-8"
+                >
+                  <div className="grid gap-6 xl:grid-cols-[13rem_1fr]">
+                    <div>
+                      <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-muted">
+                        {t('sidebar.notesTitle')}
+                      </p>
+                      <h2
+                        id="notes-heading"
+                        className="mt-2 text-xl font-bold tracking-[-0.025em]"
+                      >
+                        {t('summary.notesSection')}
+                      </h2>
+                    </div>
+                    {displayedNotes.length === 0 ? (
+                      <p className="text-xs leading-5 text-muted xl:pl-4">
+                        {t('summary.noNotes')}
+                      </p>
+                    ) : (
+                      <ul className="grid gap-3 sm:grid-cols-2">
+                        {displayedNotes.map((note, index) => (
+                          <li
+                            key={note.id || index}
+                            className="flex min-w-0 gap-4 break-words border-l border-line-strong pl-4 text-sm leading-6 text-ink-soft"
+                          >
+                            {note.text}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </section>
+              </div>
             )}
-          </section>
+
+            {activeTab === 'transcript' && (
+              <section
+                role="tabpanel"
+                id={`${tabListId}-transcript-panel`}
+                aria-labelledby={`${tabListId}-transcript-tab`}
+              >
+                <div className="mb-6 flex items-end justify-between gap-4 border-b border-line pb-5">
+                  <div>
+                    <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-muted">
+                      {t('summary.fullRecord')}
+                    </p>
+                    <h2
+                      id="transcript-heading"
+                      className="mt-2 text-2xl font-bold tracking-[-0.03em]"
+                    >
+                      {t('summary.transcript')}
+                    </h2>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted">
+                    {t(
+                      displayedTurns.length === 1
+                        ? 'common.turn'
+                        : 'common.turns',
+                      { count: displayedTurns.length },
+                    )}
+                  </span>
+                </div>
+
+                {displayedTurns.length > 0 ? (
+                  <ol className="grid gap-3">
+                    {displayedTurns.map((turn) => (
+                      <ConversationTurnCard
+                        key={turn.id}
+                        turn={turn}
+                        compact
+                        readOnly
+                      />
+                    ))}
+                  </ol>
+                ) : (
+                  <div className="border-y border-line py-12 text-center">
+                    <p className="text-sm font-semibold text-ink-soft">
+                      {t('summary.emptyTitle')}
+                    </p>
+                    <p className="mt-2 text-xs text-muted">
+                      {t('summary.emptyDescription')}
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
         </div>
-
-        <section
-          aria-labelledby="decisions-heading"
-          className="border-y border-line py-8"
-        >
-          <div className="grid gap-6 lg:grid-cols-[15rem_1fr]">
-            <div>
-              <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-muted">
-                {t('summary.alignedOutcomes')}
-              </p>
-              <h2
-                id="decisions-heading"
-                className="mt-2 text-xl font-bold tracking-[-0.025em]"
-              >
-                {t('summary.decisions')}
-              </h2>
-            </div>
-            {decisions.length === 0 ? (
-              <p className="text-xs text-muted pl-4">
-                {t('summary.noDecisions')}
-              </p>
-            ) : (
-              <ol className="grid gap-3 sm:grid-cols-2">
-                {decisions.map((decision, index) => (
-                  <li
-                    key={`${decision}-${index}`}
-                    className="flex min-w-0 gap-4 break-words border-l border-line-strong pl-4 text-sm leading-6 text-ink-soft"
-                  >
-                    <span className="font-bold text-primary">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    {decision}
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
-        </section>
-
-        <section
-          aria-labelledby="notes-heading"
-          className="border-b border-line py-8"
-        >
-          <div className="grid gap-6 lg:grid-cols-[15rem_1fr]">
-            <div>
-              <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-muted">
-                {t('sidebar.notesTitle')}
-              </p>
-              <h2
-                id="notes-heading"
-                className="mt-2 text-xl font-bold tracking-[-0.025em]"
-              >
-                {t('summary.notesSection')}
-              </h2>
-            </div>
-            {displayedNotes.length === 0 ? (
-              <p className="text-xs text-muted pl-4">
-                {t('summary.noNotes')}
-              </p>
-            ) : (
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {displayedNotes.map((note, index) => (
-                  <li
-                    key={note.id || index}
-                    className="flex min-w-0 gap-4 break-words border-l border-line-strong pl-4 text-sm leading-6 text-ink-soft"
-                  >
-                    {note.text}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
-
-        <section aria-labelledby="transcript-heading" className="pt-10 lg:pt-14">
-          <div className="mb-6 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-muted">
-                {t('summary.fullRecord')}
-              </p>
-              <h2
-                id="transcript-heading"
-                className="mt-2 text-2xl font-bold tracking-[-0.03em]"
-              >
-                {t('summary.transcript')}
-              </h2>
-            </div>
-            <span className="text-xs text-muted">
-              {t(
-                displayedTurns.length === 1
-                  ? 'common.turn'
-                  : 'common.turns',
-                { count: displayedTurns.length },
-              )}
-            </span>
-          </div>
-
-          {displayedTurns.length > 0 ? (
-            <ol className="grid gap-3">
-              {displayedTurns.map((turn) => (
-                <ConversationTurnCard
-                  key={turn.id}
-                  turn={turn}
-                  compact
-                  readOnly
-                />
-              ))}
-            </ol>
-          ) : (
-            <div className="border-y border-line py-12 text-center">
-              <p className="text-sm font-semibold text-ink-soft">
-                {t('summary.emptyTitle')}
-              </p>
-              <p className="mt-2 text-xs text-muted">
-                {t('summary.emptyDescription')}
-              </p>
-            </div>
-          )}
-        </section>
 
         <div className="mt-12 flex justify-center border-t border-line pt-8">
           <Button
@@ -643,7 +831,7 @@ interface MetadataItemProps {
 
 function MetadataItem({ icon, label, value }: MetadataItemProps) {
   return (
-    <div className="flex min-w-0 items-center gap-3 border-t border-line px-1 py-5 sm:px-5 lg:border-r lg:first:pl-0 lg:last:border-r-0">
+    <div className="flex min-w-0 items-center gap-2 border-r border-t border-line px-1 py-3 even:border-r-0 last:col-span-2 last:border-r-0 sm:gap-3 sm:px-5 sm:py-4 lg:col-span-1 lg:border-r lg:first:pl-0 lg:last:col-span-1 lg:last:border-r-0">
       <span className="text-muted" aria-hidden="true">
         {icon}
       </span>

@@ -21,6 +21,7 @@ import { MeetingHeader } from '@/components/meeting/MeetingHeader'
 import { MeetingSidebar } from '@/components/meeting/MeetingSidebar'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
+import { useMediaDevices } from '@/hooks/useMediaDevices'
 import { useMeetingClock } from '@/hooks/useMeetingClock'
 import { usePushToTalk } from '@/hooks/usePushToTalk'
 import { useRealtimeConnection } from '@/hooks/useRealtimeConnection'
@@ -70,6 +71,8 @@ export default function LiveMeetingPage() {
   const setCameraEnabled = useMeetingStore(
     (state) => state.setCameraEnabled,
   )
+  const setMicrophone = useMeetingStore((state) => state.setMicrophone)
+  const setCamera = useMeetingStore((state) => state.setCamera)
   const setSpeaker = useMeetingStore((state) => state.setSpeaker)
   const toggleCamera = useMeetingStore(
     (state) => state.toggleCamera,
@@ -101,6 +104,7 @@ export default function LiveMeetingPage() {
     hasRemoteParticipant: false,
     hasRemoteVideo: false,
   })
+  const mediaDevices = useMediaDevices()
 
   const elapsedSeconds = useMeetingClock(
     meeting.startedAt,
@@ -363,6 +367,7 @@ export default function LiveMeetingPage() {
                     cameraEnabled={cameraEnabled}
                     sharingEnabled={sharingEnabled}
                     microphoneId={meeting.microphoneId}
+                    cameraId={meeting.cameraId ?? ''}
                     speakerId={meeting.speakerId}
                     onMicrophoneTrackChange={setMicrophoneTrack}
                     onMediaStateRejected={handleMediaRejected}
@@ -415,6 +420,7 @@ export default function LiveMeetingPage() {
             onToggleMode={handleToggleMode}
             onSwapLanguages={swapLanguages}
             onAddNote={() => setNoteDialogOpen(true)}
+            onOpenContext={() => setContextOpen(true)}
             onRetryRealtime={retryConnection}
             realtimeStatus={realtimeStatus}
             realtimeWarning={realtimeWarning}
@@ -433,6 +439,10 @@ export default function LiveMeetingPage() {
         conversationVisible={captionsEnabled}
         translationFocused={translationFocused}
         mediaControlsDisabled={!livekitConnected}
+        mediaDevices={mediaDevices}
+        microphoneId={meeting.microphoneId}
+        cameraId={meeting.cameraId ?? ''}
+        speakerId={meeting.speakerId}
         onToggleMicrophone={toggleMicrophone}
         onToggleCamera={toggleCamera}
         onToggleCaptions={() =>
@@ -441,7 +451,9 @@ export default function LiveMeetingPage() {
         onToggleSharing={() =>
           setSharingEnabled((enabled) => !enabled)
         }
-        onOpenContext={() => setContextOpen(true)}
+        onSelectMicrophone={setMicrophone}
+        onSelectCamera={setCamera}
+        onSelectSpeaker={setSpeaker}
         onEndMeeting={() => setEndDialogOpen(true)}
         onPushToTalkStart={pushToTalk.start}
         onPushToTalkStop={pushToTalk.stop}
@@ -489,10 +501,11 @@ export default function LiveMeetingPage() {
         onClose={() => setContextOpen(false)}
         title={t('meeting.contextTitle')}
         description={t('meeting.contextDescription')}
-        size="lg"
+        size="xl"
+        bodyClassName="overflow-hidden p-0 sm:p-0"
       >
-        <div className="-m-5 h-[68vh] min-h-[28rem] sm:-m-6">
-          <MeetingSidebar className="h-full border-l-0" />
+        <div className="h-[min(30rem,calc(100dvh-10rem))] min-h-[24rem]">
+          <MeetingSidebar className="h-full" />
         </div>
       </Dialog>
 

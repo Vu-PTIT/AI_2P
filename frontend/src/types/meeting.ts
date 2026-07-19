@@ -80,6 +80,7 @@ export interface Meeting {
   localLanguage: Language
   conversationMode: ConversationMode
   microphoneId: string
+  cameraId: string
   speakerId: string
   languageOrder: LanguageOrder
   glossary: GlossaryTerm[]

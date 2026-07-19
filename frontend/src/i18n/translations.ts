@@ -48,6 +48,7 @@ const en = {
   'landing.independentAudio': 'Separate audio channels',
   'landing.joinEyebrow': 'Join an existing room',
   'landing.joinTitle': 'Enter a room code to join',
+  'landing.joinWithCode': 'Join with a code',
   'landing.roomCodeLabel': 'Room code',
   'landing.roomCodeHint': 'Use the exact room ID that was shared with you.',
   'landing.roomCodePlaceholder': 'e.g. room-a1b2c3d4',
@@ -198,6 +199,9 @@ const en = {
   'devices.microphone': 'Microphone device',
   'devices.noMicrophone': 'No microphone found',
   'devices.microphoneFallback': 'Microphone {{count}}',
+  'devices.camera': 'Camera device',
+  'devices.noCamera': 'No camera found',
+  'devices.cameraFallback': 'Camera {{count}}',
   'devices.speaker': 'Speaker output',
   'devices.speakerFallback': 'Speaker {{count}}',
   'devices.systemSpeaker': 'System default — controlled by browser',
@@ -271,6 +275,7 @@ const en = {
   'meeting.contextTitle': 'Meeting context',
   'meeting.contextDescription':
     'Participants, glossary, notes, and connection status.',
+  'meeting.contextButton': 'Meeting info',
   'meeting.noteDialogTitle': 'Add meeting note',
   'meeting.noteDialogDescription':
     'Notes remain in this browser session and are included with the meeting state.',
@@ -318,6 +323,17 @@ const en = {
   'controls.stopShare': 'Stop share',
   'controls.share': 'Share',
   'controls.more': 'More',
+  'controls.devices': 'Devices',
+  'controls.deviceMenuTitle': 'Audio & video devices',
+  'controls.deviceMenuDescription':
+    'Changes apply immediately to this meeting.',
+  'controls.deviceListChecking': 'Looking for connected devices…',
+  'controls.deviceListUnsupported':
+    'This browser cannot list media devices.',
+  'controls.deviceListError':
+    'Devices could not be loaded. Check browser permissions and try again.',
+  'controls.refreshDevices': 'Refresh device list',
+  'controls.closeDeviceMenu': 'Close device settings',
   'controls.endCall': 'End call',
   'controls.holdToTalk': 'Hold to talk',
   'controls.talking': 'Talking',
@@ -386,6 +402,9 @@ const en = {
   'sidebar.participants': 'Participants',
   'sidebar.glossary': 'Glossary',
   'sidebar.notes': 'Notes',
+  'sidebar.system': 'Status',
+  'sidebar.systemDescription':
+    'Connection and translation signals for this meeting.',
   'sidebar.inMeeting': 'In this meeting',
   'sidebar.glossaryDescription':
     'Preferred terminology for this meeting.',
@@ -427,6 +446,15 @@ const en = {
   'summary.participants': 'Participants',
   'summary.notRecorded': 'Not recorded',
   'summary.title': 'Summary',
+  'summary.tabsLabel': 'Meeting content',
+  'summary.detailLabel': 'Meeting detail',
+  'summary.summaryTab': 'Summary',
+  'summary.transcriptTab': 'Transcript',
+  'summary.aiModel': 'FPT AI model',
+  'summary.generating': 'Generating…',
+  'summary.regenerateAi': 'Regenerate with AI',
+  'summary.generatingDescription':
+    'FPT AI is preparing the meeting summary…',
   'summary.localNotice':
     'Prepared locally in this browser from the recorded transcript and meeting notes.',
   'summary.generatedOne':
@@ -522,6 +550,7 @@ const vi = {
   'landing.independentAudio': 'Kênh âm thanh riêng biệt',
   'landing.joinEyebrow': 'Tham gia phòng có sẵn',
   'landing.joinTitle': 'Nhập mã phòng để tham gia',
+  'landing.joinWithCode': 'Tham gia bằng mã',
   'landing.roomCodeLabel': 'Mã phòng',
   'landing.roomCodeHint': 'Dùng đúng mã phòng đã được chia sẻ với bạn.',
   'landing.roomCodePlaceholder': 'vd: room-a1b2c3d4',
@@ -673,6 +702,9 @@ const vi = {
   'devices.microphone': 'Thiết bị micro',
   'devices.noMicrophone': 'Không tìm thấy micro',
   'devices.microphoneFallback': 'Micro {{count}}',
+  'devices.camera': 'Thiết bị camera',
+  'devices.noCamera': 'Không tìm thấy camera',
+  'devices.cameraFallback': 'Camera {{count}}',
   'devices.speaker': 'Đầu ra loa',
   'devices.speakerFallback': 'Loa {{count}}',
   'devices.systemSpeaker': 'Loa mặc định — do trình duyệt quản lý',
@@ -746,6 +778,7 @@ const vi = {
   'meeting.contextTitle': 'Thông tin cuộc họp',
   'meeting.contextDescription':
     'Người tham gia, thuật ngữ, ghi chú và trạng thái kết nối.',
+  'meeting.contextButton': 'Thông tin',
   'meeting.noteDialogTitle': 'Thêm ghi chú cuộc họp',
   'meeting.noteDialogDescription':
     'Ghi chú được giữ trong phiên trình duyệt này và lưu cùng trạng thái cuộc họp.',
@@ -792,6 +825,17 @@ const vi = {
   'controls.stopShare': 'Dừng chia sẻ',
   'controls.share': 'Chia sẻ',
   'controls.more': 'Thêm',
+  'controls.devices': 'Thiết bị',
+  'controls.deviceMenuTitle': 'Thiết bị âm thanh & video',
+  'controls.deviceMenuDescription':
+    'Thay đổi được áp dụng ngay trong cuộc họp này.',
+  'controls.deviceListChecking': 'Đang tìm thiết bị đã kết nối…',
+  'controls.deviceListUnsupported':
+    'Trình duyệt này không thể liệt kê thiết bị media.',
+  'controls.deviceListError':
+    'Không thể tải thiết bị. Hãy kiểm tra quyền trình duyệt rồi thử lại.',
+  'controls.refreshDevices': 'Quét lại thiết bị',
+  'controls.closeDeviceMenu': 'Đóng cài đặt thiết bị',
   'controls.endCall': 'Kết thúc',
   'controls.holdToTalk': 'Giữ để nói',
   'controls.talking': 'Đang nói',
@@ -860,6 +904,9 @@ const vi = {
   'sidebar.participants': 'Người tham gia',
   'sidebar.glossary': 'Thuật ngữ',
   'sidebar.notes': 'Ghi chú',
+  'sidebar.system': 'Trạng thái',
+  'sidebar.systemDescription':
+    'Tín hiệu kết nối và dịch thuật của cuộc họp này.',
   'sidebar.inMeeting': 'Trong cuộc họp',
   'sidebar.glossaryDescription':
     'Thuật ngữ ưu tiên cho cuộc họp này.',
@@ -901,6 +948,15 @@ const vi = {
   'summary.participants': 'Người tham gia',
   'summary.notRecorded': 'Chưa ghi nhận',
   'summary.title': 'Tổng kết',
+  'summary.tabsLabel': 'Nội dung cuộc họp',
+  'summary.detailLabel': 'Chi tiết cuộc họp',
+  'summary.summaryTab': 'Tổng kết',
+  'summary.transcriptTab': 'Biên bản',
+  'summary.aiModel': 'Mô hình FPT AI',
+  'summary.generating': 'Đang tạo…',
+  'summary.regenerateAi': 'Tạo lại bằng AI',
+  'summary.generatingDescription':
+    'FPT AI đang chuẩn bị bản tổng kết cuộc họp…',
   'summary.localNotice':
     'Được tổng hợp cục bộ trong trình duyệt từ biên bản và ghi chú cuộc họp.',
   'summary.generatedOne':

@@ -43,6 +43,7 @@ export interface MeetingStoreActions {
   setLocalLanguage: (language: Language) => void
   setConversationMode: (mode: ConversationMode) => void
   setMicrophone: (microphoneId: string) => void
+  setCamera: (cameraId: string) => void
   setSpeaker: (speakerId: string) => void
   setMicrophoneEnabled: (enabled: boolean) => void
   toggleMicrophone: () => void
@@ -243,6 +244,15 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
       meeting: {
         ...state.meeting,
         microphoneId,
+      },
+    }))
+  },
+
+  setCamera: (cameraId) => {
+    set((state) => ({
+      meeting: {
+        ...state.meeting,
+        cameraId,
       },
     }))
   },

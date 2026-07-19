@@ -12,13 +12,15 @@ export interface DialogProps {
   description?: string
   children: ReactNode
   footer?: ReactNode
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+  bodyClassName?: string
 }
 
 const sizeClasses = {
   sm: 'max-w-md',
   md: 'max-w-xl',
   lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
 } as const
 
 export function Dialog({
@@ -29,6 +31,7 @@ export function Dialog({
   children,
   footer,
   size = 'md',
+  bodyClassName,
 }: DialogProps) {
   const { t } = useTranslation()
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -90,7 +93,12 @@ export function Dialog({
           onClick={onClose}
         />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+      <div
+        className={cn(
+          'min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6',
+          bodyClassName,
+        )}
+      >
         {children}
       </div>
       {footer && (

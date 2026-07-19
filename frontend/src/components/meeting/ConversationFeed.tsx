@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ArrowDown,
   AudioLines,
+  BookOpenText,
   CircleAlert,
   FilePlus2,
   Languages,
@@ -34,6 +35,7 @@ export interface ConversationFeedProps {
   onToggleMode: () => void
   onSwapLanguages: () => void
   onAddNote: () => void
+  onOpenContext: () => void
   onRetryRealtime: () => void
   realtimeStatus?: RealtimeSessionStatus
   realtimeWarning?: RealtimeErrorEvent | null
@@ -49,6 +51,7 @@ export function ConversationFeed({
   onToggleMode,
   onSwapLanguages,
   onAddNote,
+  onOpenContext,
   onRetryRealtime,
   realtimeStatus,
   realtimeWarning,
@@ -161,7 +164,7 @@ export function ConversationFeed({
           </span>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-1 sm:flex sm:flex-wrap sm:gap-1.5">
+        <div className="mt-3 grid grid-cols-4 gap-1 sm:flex sm:flex-wrap sm:gap-1.5">
           <Button
             variant="ghost"
             size="sm"
@@ -189,6 +192,17 @@ export function ConversationFeed({
             className="w-full gap-1 whitespace-nowrap px-0 text-[0.625rem] sm:w-auto sm:gap-1.5 sm:px-3 sm:text-xs"
           >
             {t('meeting.note')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            leadingIcon={
+              <BookOpenText className="size-3.5" aria-hidden="true" />
+            }
+            onClick={onOpenContext}
+            className="w-full gap-1 whitespace-nowrap px-0 text-[0.625rem] sm:w-auto sm:gap-1.5 sm:px-3 sm:text-xs"
+          >
+            {t('meeting.contextButton')}
           </Button>
         </div>
 

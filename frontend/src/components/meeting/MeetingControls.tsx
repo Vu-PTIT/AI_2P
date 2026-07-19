@@ -1,14 +1,17 @@
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   Captions,
   Mic,
   MicOff,
-  MoreHorizontal,
   PhoneOff,
   ScreenShare,
+  SlidersHorizontal,
   Video,
   VideoOff,
 } from 'lucide-react'
 
+import { MeetingDeviceMenu } from '@/components/meeting/MeetingDeviceMenu'
+import type { MediaDevicesState } from '@/hooks/useMediaDevices'
 import { useTranslation } from '@/hooks/useTranslation'
 import { cn } from '@/lib/utils'
 import type { ConversationMode } from '@/types/meeting'
@@ -23,11 +26,17 @@ export interface MeetingControlsProps {
   conversationVisible: boolean
   translationFocused?: boolean
   mediaControlsDisabled?: boolean
+  mediaDevices: MediaDevicesState
+  microphoneId: string
+  cameraId: string
+  speakerId: string
   onToggleMicrophone: () => void
   onToggleCamera: () => void
   onToggleCaptions: () => void
   onToggleSharing: () => void
-  onOpenContext: () => void
+  onSelectMicrophone: (deviceId: string) => void
+  onSelectCamera: (deviceId: string) => void
+  onSelectSpeaker: (deviceId: string) => void
   onEndMeeting: () => void
   onPushToTalkStart: () => void
   onPushToTalkStop: () => void
@@ -43,22 +52,58 @@ export function MeetingControls({
   conversationVisible,
   translationFocused = false,
   mediaControlsDisabled = false,
+  mediaDevices,
+  microphoneId,
+  cameraId,
+  speakerId,
   onToggleMicrophone,
   onToggleCamera,
   onToggleCaptions,
   onToggleSharing,
-  onOpenContext,
+  onSelectMicrophone,
+  onSelectCamera,
+  onSelectSpeaker,
   onEndMeeting,
   onPushToTalkStart,
   onPushToTalkStop,
 }: MeetingControlsProps) {
   const { t } = useTranslation()
+  const [deviceMenuOpen, setDeviceMenuOpen] = useState(false)
+  const controlsRef = useRef<HTMLDivElement>(null)
+  const deviceMenuId = useId()
   const isPushToTalk = conversationMode === 'push-to-talk'
   const microphoneActive =
     microphoneEnabled &&
     (isPushToTalk ? pushToTalkActive : microphoneEnabled)
   const canHoldToTalk =
     isPushToTalk && microphoneEnabled && !mediaControlsDisabled
+
+  useEffect(() => {
+    if (!deviceMenuOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !controlsRef.current?.contains(event.target)
+      ) {
+        setDeviceMenuOpen(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDeviceMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [deviceMenuOpen])
 
   return (
     <div
@@ -70,7 +115,24 @@ export function MeetingControls({
             : 'lg:right-[33.333%]'),
       )}
     >
-      <div className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-[14px] border border-line-strong bg-panel p-1 shadow-[0_10px_28px_rgb(16_24_40/0.14)] sm:gap-1.5 sm:p-2">
+      <div
+        ref={controlsRef}
+        className="pointer-events-auto relative flex max-w-full items-center gap-0.5 rounded-[14px] border border-line-strong bg-panel p-1 shadow-[0_10px_28px_rgb(16_24_40/0.14)] sm:gap-1.5 sm:p-2"
+      >
+        {deviceMenuOpen && (
+          <MeetingDeviceMenu
+            id={deviceMenuId}
+            mediaDevices={mediaDevices}
+            microphoneId={microphoneId}
+            cameraId={cameraId}
+            speakerId={speakerId}
+            onSelectMicrophone={onSelectMicrophone}
+            onSelectCamera={onSelectCamera}
+            onSelectSpeaker={onSelectSpeaker}
+            onClose={() => setDeviceMenuOpen(false)}
+          />
+        )}
+
         <ControlButton
           label={
             !microphoneEnabled
@@ -138,9 +200,15 @@ export function MeetingControls({
           onClick={onToggleSharing}
         />
         <ControlButton
-          label={t('controls.more')}
-          icon={<MoreHorizontal className="size-4" aria-hidden="true" />}
-          onClick={onOpenContext}
+          label={t('controls.devices')}
+          icon={
+            <SlidersHorizontal className="size-4" aria-hidden="true" />
+          }
+          active={deviceMenuOpen}
+          pressed={deviceMenuOpen}
+          ariaControls={deviceMenuId}
+          ariaExpanded={deviceMenuOpen}
+          onClick={() => setDeviceMenuOpen((open) => !open)}
         />
         <span
           className="mx-0.5 hidden h-8 w-px bg-line sm:block"
@@ -168,6 +236,8 @@ interface ControlButtonProps {
   deviceOff?: boolean
   endCall?: boolean
   disabled?: boolean
+  ariaControls?: string
+  ariaExpanded?: boolean
 }
 
 function ControlButton({
@@ -181,6 +251,8 @@ function ControlButton({
   deviceOff = false,
   endCall = false,
   disabled = false,
+  ariaControls,
+  ariaExpanded,
 }: ControlButtonProps) {
   return (
     <button
@@ -189,6 +261,8 @@ function ControlButton({
       aria-label={label}
       title={label}
       aria-pressed={pressed}
+      aria-controls={ariaControls}
+      aria-expanded={ariaExpanded}
       onClick={onClick}
       onPointerDown={
         onHoldStart

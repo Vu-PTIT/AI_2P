@@ -22,6 +22,7 @@ export interface MediaDeviceOption {
 
 export interface MediaDevicesState {
   microphones: MediaDeviceOption[]
+  cameras: MediaDeviceOption[]
   speakers: MediaDeviceOption[]
   permissionState: MicrophonePermissionState
   listStatus: MediaDeviceListStatus
@@ -37,10 +38,15 @@ export function useMediaDevices(): MediaDevicesState {
   const microphoneId = useMeetingStore(
     (state) => state.meeting.microphoneId,
   )
+  const cameraId = useMeetingStore(
+    (state) => state.meeting.cameraId ?? '',
+  )
   const speakerId = useMeetingStore((state) => state.meeting.speakerId)
   const setMicrophone = useMeetingStore((state) => state.setMicrophone)
+  const setCamera = useMeetingStore((state) => state.setCamera)
   const setSpeaker = useMeetingStore((state) => state.setSpeaker)
   const [microphones, setMicrophones] = useState<MediaDeviceOption[]>([])
+  const [cameras, setCameras] = useState<MediaDeviceOption[]>([])
   const [speakers, setSpeakers] = useState<MediaDeviceOption[]>([])
   const [permissionState, setPermissionState] =
     useState<MicrophonePermissionState>('unknown')
@@ -56,6 +62,7 @@ export function useMediaDevices(): MediaDevicesState {
     if (!navigator.mediaDevices?.enumerateDevices) {
       setListStatus('unsupported')
       setMicrophones([])
+      setCameras([])
       setSpeakers([])
       return
     }
@@ -65,11 +72,15 @@ export function useMediaDevices(): MediaDevicesState {
       const nextMicrophones = devices
         .filter((device) => device.kind === 'audioinput')
         .map((device) => ({ id: device.deviceId, label: device.label }))
+      const nextCameras = devices
+        .filter((device) => device.kind === 'videoinput')
+        .map((device) => ({ id: device.deviceId, label: device.label }))
       const nextSpeakers = devices
         .filter((device) => device.kind === 'audiooutput')
         .map((device) => ({ id: device.deviceId, label: device.label }))
 
       setMicrophones(nextMicrophones)
+      setCameras(nextCameras)
       setSpeakers(nextSpeakers)
       setListStatus('ready')
 
@@ -80,6 +91,15 @@ export function useMediaDevices(): MediaDevicesState {
         setMicrophone(nextMicrophones[0]?.id ?? '')
       } else if (!microphoneId && nextMicrophones[0]) {
         setMicrophone(nextMicrophones[0].id)
+      }
+
+      if (
+        cameraId &&
+        !nextCameras.some((device) => device.id === cameraId)
+      ) {
+        setCamera(nextCameras[0]?.id ?? '')
+      } else if (!cameraId && nextCameras[0]) {
+        setCamera(nextCameras[0].id)
       }
 
       if (!supportsOutputSelection()) {
@@ -97,10 +117,13 @@ export function useMediaDevices(): MediaDevicesState {
     } catch {
       setListStatus('error')
       setMicrophones([])
+      setCameras([])
       setSpeakers([])
     }
   }, [
+    cameraId,
     microphoneId,
+    setCamera,
     setMicrophone,
     setSpeaker,
     speakerId,
@@ -185,6 +208,7 @@ export function useMediaDevices(): MediaDevicesState {
 
   return {
     microphones,
+    cameras,
     speakers,
     permissionState,
     listStatus,

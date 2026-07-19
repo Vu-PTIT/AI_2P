@@ -124,7 +124,7 @@ export default function LandingPage() {
       <main id="main-content">
         <section className="landing-hero relative overflow-hidden">
           <div className="landing-grid-lines" aria-hidden="true" />
-          <div className="relative mx-auto grid min-h-[calc(100svh-4.5rem)] max-w-[1240px] items-center gap-14 px-5 py-14 sm:px-6 sm:py-20 lg:grid-cols-[minmax(0,0.91fr)_minmax(30rem,1.09fr)] lg:gap-12 lg:px-8 lg:py-24 xl:gap-20">
+          <div className="relative mx-auto grid min-h-[calc(100svh-4.5rem)] max-w-[1240px] items-center gap-12 px-5 py-10 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(29rem,1.05fr)] lg:gap-12 lg:px-8 lg:py-14 xl:gap-16 xl:py-16">
             <div className="relative z-10 min-w-0">
               <div className="landing-reveal flex w-fit items-center gap-2.5 rounded-full border border-primary/20 bg-primary/7 px-3 py-2 text-[0.6875rem] font-bold tracking-[0.14em] text-primary uppercase">
                 <span className="relative flex size-2">
@@ -134,18 +134,18 @@ export default function LandingPage() {
                 {t('landing.eyebrow')}
               </div>
 
-              <h1 className="landing-display landing-reveal landing-delay-1 mt-7 max-w-[10.5ch] text-[clamp(3.35rem,7.2vw,6.45rem)] leading-[0.88] font-medium tracking-[-0.065em] text-ink">
+              <h1 className="landing-display landing-reveal landing-delay-1 mt-6 max-w-[11ch] text-[clamp(3.1rem,6.2vw,5.8rem)] leading-[0.9] font-medium tracking-[-0.06em] text-ink sm:max-w-[13ch]">
                 {t('landing.headlineFirst')}
                 <span className="mt-2 block text-primary italic">
                   {t('landing.headlineSecond')}
                 </span>
               </h1>
 
-              <p className="landing-reveal landing-delay-2 mt-8 max-w-[37rem] text-base leading-7 text-muted-strong sm:text-lg sm:leading-8">
+              <p className="landing-reveal landing-delay-2 mt-6 max-w-[37rem] text-base leading-7 text-muted-strong sm:text-lg sm:leading-8">
                 {t('landing.description')}
               </p>
 
-              <div className="landing-reveal landing-delay-3 mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="landing-reveal landing-delay-3 mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Button
                   onClick={handleStartMeeting}
                   size="lg"
@@ -161,10 +161,10 @@ export default function LandingPage() {
                   {t('nav.startMeeting')}
                 </Button>
                 <a
-                  href="#how-it-works"
-                  className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
+                  href="#join-room"
+                  className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-ink/15 px-5 text-sm font-semibold text-ink-soft transition-[background-color,border-color,color] hover:border-primary/30 hover:bg-primary/6 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
-                  {t('landing.exploreHow')}
+                  {t('landing.joinWithCode')}
                   <ArrowDown
                     aria-hidden="true"
                     className="size-4 transition-transform duration-200 ease-out group-hover:translate-y-1"
@@ -175,37 +175,37 @@ export default function LandingPage() {
               <section
                 id="join-room"
                 aria-labelledby="join-room-title"
-                className="landing-reveal landing-delay-4 mt-7 scroll-mt-24 rounded-[24px_24px_8px_24px] border border-primary/20 bg-[#eef2fa] p-4 shadow-[0_16px_35px_rgb(37_99_235/0.09)] sm:p-5"
+                className="landing-reveal landing-delay-4 mt-5 scroll-mt-24 border-t border-ink/15 pt-5"
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
                   <div>
                     <p className="text-[0.625rem] font-bold tracking-[0.15em] text-primary uppercase">
                       {t('landing.joinEyebrow')}
                     </p>
                     <h2
                       id="join-room-title"
-                      className="mt-1 text-lg font-semibold tracking-[-0.025em] text-ink"
+                      className="mt-1 text-base font-semibold tracking-[-0.02em] text-ink"
                     >
                       {t('landing.joinTitle')}
                     </h2>
                   </div>
-                  <span className="text-xs font-semibold text-primary">
+                  <span className="hidden text-xs font-semibold text-primary sm:inline">
                     {t('common.languagePair')}
                   </span>
                 </div>
 
                 <form
                   onSubmit={handleJoinMeeting}
-                  className="mt-4"
+                  className="mt-3"
                   noValidate
                 >
                   <label
                     htmlFor="room-code"
-                    className="sr-only"
+                    className="text-xs font-semibold text-muted-strong"
                   >
                     {t('landing.roomCodeLabel')}
                   </label>
-                  <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="mt-1.5 grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <input
                       id="room-code"
                       value={roomCode}
@@ -222,7 +222,7 @@ export default function LandingPage() {
                       className={`h-12 w-full rounded-full border bg-[#fbfaf6] px-5 text-base text-ink outline-none placeholder:text-muted transition-[border-color,box-shadow] hover:border-muted focus:border-primary focus:ring-3 focus:ring-primary/12 ${
                         roomCodeError
                           ? 'border-danger'
-                          : 'border-primary/25'
+                          : 'border-ink/20'
                       }`}
                     />
                     <Button
@@ -259,7 +259,7 @@ export default function LandingPage() {
                 </form>
               </section>
 
-              <div className="landing-reveal landing-delay-4 mt-6 flex flex-wrap gap-x-6 gap-y-3 border-t border-ink/10 pt-5 text-xs font-medium text-muted-strong">
+              <div className="landing-reveal landing-delay-4 mt-5 flex flex-wrap gap-x-6 gap-y-3 text-xs font-medium text-muted-strong">
                 <span className="inline-flex items-center gap-2">
                   <Languages
                     aria-hidden="true"

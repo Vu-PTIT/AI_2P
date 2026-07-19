@@ -77,6 +77,7 @@ export function PreJoinDeviceSetup({
     (state) => state.setAudioInputLevel,
   )
   const setMicrophone = useMeetingStore((state) => state.setMicrophone)
+  const setCamera = useMeetingStore((state) => state.setCamera)
   const setSpeaker = useMeetingStore((state) => state.setSpeaker)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [cameraStatus, setCameraStatus] =
@@ -104,7 +105,9 @@ export function PreJoinDeviceSetup({
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user' },
+          video: meeting.cameraId
+            ? { deviceId: { exact: meeting.cameraId } }
+            : { facingMode: 'user' },
           audio: false,
         })
 
@@ -135,7 +138,7 @@ export function PreJoinDeviceSetup({
         videoElement.srcObject = null
       }
     }
-  }, [cameraEnabled, setCameraEnabled])
+  }, [cameraEnabled, meeting.cameraId, setCameraEnabled])
 
   const handleMicrophoneToggle = () => {
     if (microphoneEnabled) {
@@ -311,6 +314,32 @@ export function PreJoinDeviceSetup({
                 )}
               </StatusBadge>
             </div>
+
+            <label className="grid gap-2 text-xs font-semibold text-ink-soft">
+              {t('devices.camera')}
+              <select
+                value={meeting.cameraId ?? ''}
+                onChange={(event) => setCamera(event.target.value)}
+                disabled={
+                  mediaDevices.listStatus !== 'ready' ||
+                  mediaDevices.cameras.length === 0
+                }
+                className="h-11 min-w-0 rounded-[10px] border border-line-strong bg-panel px-3 text-sm text-ink outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {mediaDevices.cameras.length === 0 ? (
+                  <option value="">{t('devices.noCamera')}</option>
+                ) : (
+                  mediaDevices.cameras.map((device, index) => (
+                    <option key={device.id} value={device.id}>
+                      {device.label ||
+                        t('devices.cameraFallback', {
+                          count: index + 1,
+                        })}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
 
             <label className="grid gap-2 text-xs font-semibold text-ink-soft">
               {t('devices.speaker')}

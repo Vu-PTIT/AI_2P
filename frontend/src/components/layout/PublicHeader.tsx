@@ -28,12 +28,12 @@ export function PublicHeader() {
           >
             {t('nav.privacy')}
           </a>
-          {/*<a
+          <a
             href="#join-room"
             className="hidden min-h-11 items-center px-3 text-sm font-medium text-muted-strong transition-colors hover:text-ink lg:inline-flex"
           >
             {t('nav.joinRoom')}
-          </a>*/}
+          </a>
           <LocaleSwitcher className="ml-1" />
           <Link
             to={ROUTES.create}
