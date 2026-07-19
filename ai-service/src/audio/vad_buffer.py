@@ -49,11 +49,13 @@ class VadBuffer:
             self._silence_count = 0
             self._in_speech = True
 
-            now = time.monotonic()
-            if now - self._last_interim >= self._interim_interval_s:
-                self._last_interim = now
-                interim_audio = np.concatenate(self._speech_buf)
-                self._on_interim(interim_audio)
+            total_samples = sum(len(f) for f in self._speech_buf)
+            if total_samples >= _SAMPLE_RATE * 0.4:
+                now = time.monotonic()
+                if self._last_interim == 0.0 or (now - self._last_interim >= self._interim_interval_s):
+                    self._last_interim = now
+                    interim_audio = np.concatenate(self._speech_buf)
+                    self._on_interim(interim_audio)
         else:
             if self._in_speech:
                 self._silence_count += 1

@@ -40,6 +40,7 @@ class SessionWorker:
         self._initialized: bool = False
         self._utterance_id: str = ""
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._ws_lock = asyncio.Lock()
 
         self._audio_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=500)
         self._pcm_remainder: np.ndarray = np.array([], dtype=np.float32)  # leftover samples between chunks
@@ -322,42 +323,45 @@ class SessionWorker:
             if not text:
                 return
 
-            # Stream any remaining words before emitting stt.final
-            await self._stream_stt_words(old_interim_text, text, utt_id)
-
-            await self._send_json({
-                "type": "stt.final",
-                "text": text,
-                "speaker": self._speaker,
-                "utteranceId": utt_id,
-            })
-            logger.info("stt.final [%s]: %r", self._speaker, text[:80])
-
             src, tgt = self._speaker, self._other_language()
 
-            last_partial = ""
-            async for partial in fpt_translate.translate_stream(
-                text, src, tgt, history=self._history, glossary=self._glossary, mode="final"
-            ):
-                last_partial = partial
+            async def _stream_final_stt() -> None:
+                # Stream any remaining words before emitting stt.final
+                await self._stream_stt_words(old_interim_text, text, utt_id)
                 await self._send_json({
-                    "type": "translate.partial",
-                    "text": partial,
-                    "sourceText": text,
+                    "type": "stt.final",
+                    "text": text,
                     "speaker": self._speaker,
                     "utteranceId": utt_id,
                 })
+                logger.info("stt.final [%s]: %r", self._speaker, text[:80])
 
-            if last_partial:
-                self._history.append((src, text, last_partial))
-                await self._send_json({
-                    "type": "translate.done",
-                    "fullText": last_partial,
-                    "sourceText": text,
-                    "speaker": self._speaker,
-                    "utteranceId": utt_id,
-                })
-                logger.info("translate.done [%s→%s]: %r", src, tgt, last_partial[:80])
+            async def _stream_final_translate() -> None:
+                last_partial = ""
+                async for partial in fpt_translate.translate_stream(
+                    text, src, tgt, history=self._history, glossary=self._glossary, mode="final"
+                ):
+                    last_partial = partial
+                    await self._send_json({
+                        "type": "translate.partial",
+                        "text": partial,
+                        "sourceText": text,
+                        "speaker": self._speaker,
+                        "utteranceId": utt_id,
+                    })
+
+                if last_partial:
+                    self._history.append((src, text, last_partial))
+                    await self._send_json({
+                        "type": "translate.done",
+                        "fullText": last_partial,
+                        "sourceText": text,
+                        "speaker": self._speaker,
+                        "utteranceId": utt_id,
+                    })
+                    logger.info("translate.done [%s→%s]: %r", src, tgt, last_partial[:80])
+
+            await asyncio.gather(_stream_final_stt(), _stream_final_translate())
         except asyncio.CancelledError:
             pass
 
@@ -394,7 +398,8 @@ class SessionWorker:
 
     async def _send_json(self, payload: dict[str, Any]) -> None:
         try:
-            await self._ws.send(json.dumps(payload))
+            async with self._ws_lock:
+                await self._ws.send(json.dumps(payload))
         except Exception as exc:  # noqa: BLE001
             logger.debug("WS send error: %s", exc)
 
