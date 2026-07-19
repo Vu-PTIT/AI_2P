@@ -28,6 +28,10 @@ FPT_STREAM_LLM_MODEL: str = _optional(
     "FPT_STREAM_LLM_MODEL", _optional("FPT_LLM_MODEL", "SaoLa3.1-medium")
 )
 FPT_LLM_MODEL: str = _optional("FPT_LLM_MODEL", "SaoLa3.1-medium")
+FPT_SUMMARY_MODEL: str = _optional(
+    "FPT_SUMMARY_MODEL", _optional("FPT_LLM_MODEL", "SaoLa3.1-medium")
+)
+
 
 
 def get_asr_model(language: str) -> str:

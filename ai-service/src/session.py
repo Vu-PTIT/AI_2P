@@ -115,6 +115,12 @@ class SessionWorker:
                     self._vad_buf.reset()
                 self._utterance_id = ""
                 logger.info("Speaker switched → %s", self._speaker)
+        elif msg_type == "session.summarize":
+            title = msg.get("title", "")
+            turns = msg.get("turns", [])
+            notes = msg.get("notes", [])
+            if self._loop:
+                self._loop.create_task(self._run_summary(title, turns, notes))
 
     async def _on_audio(self, raw: bytes) -> None:
         if not self._initialized:
@@ -376,6 +382,37 @@ class SessionWorker:
 
     def _other_language(self) -> str:
         return "en" if self._speaker == "vi" else "vi"
+
+    async def _run_summary(
+        self,
+        title: str,
+        turns: list[dict[str, Any]] | list[tuple[str, str, str]],
+        notes: list[str] | list[dict[str, Any]] | None = None,
+    ) -> None:
+        try:
+            from src.summary import fpt_summary
+
+            accumulated = ""
+            async for partial in fpt_summary.summarize_meeting_stream(
+                title, turns, notes
+            ):
+                accumulated = partial
+                await self._send_json({
+                    "type": "summary.partial",
+                    "summary": partial,
+                })
+
+            await self._send_json({
+                "type": "summary.done",
+                "summary": accumulated,
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Summary generation error: %s", exc)
+            await self._send_json({
+                "type": "error",
+                "code": "SUMMARY_FAILED",
+                "message": str(exc),
+            })
 
     async def _probe_external_apis(self) -> bool:
         """Quick LLM ping to verify API key and connectivity before declaring ready."""
