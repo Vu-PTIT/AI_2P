@@ -75,18 +75,38 @@ class AudioProcessor:
             # silero-vad >= 5.0 ships its own loader
             from silero_vad import load_silero_vad  # type: ignore[import]
 
-            model = load_silero_vad(onnx=True)
-            logger.info("Silero VAD loaded via silero_vad package (ONNX)")
-            return model
-        except ImportError:
+            try:
+                model = load_silero_vad(onnx=True)
+                logger.info("Silero VAD loaded via silero_vad package (ONNX)")
+                return model
+            except (ImportError, ModuleNotFoundError) as exc:
+                if "onnxruntime" in str(exc):
+                    logger.warning("onnxruntime not installed. Falling back to PyTorch Silero VAD (onnx=False)... Tip: pip install onnxruntime")
+                    model = load_silero_vad(onnx=False)
+                    logger.info("Silero VAD loaded via silero_vad package (PyTorch)")
+                    return model
+                raise
+        except (ImportError, ModuleNotFoundError):
             # Fallback: older API via torch.hub
             logger.info("Falling back to torch.hub for Silero VAD")
-            model, _ = torch.hub.load(
-                "snakers4/silero-vad",
-                "silero_vad",
-                force_reload=False,
-                onnx=True,
-            )
+            try:
+                model, _ = torch.hub.load(
+                    "snakers4/silero-vad",
+                    "silero_vad",
+                    force_reload=False,
+                    onnx=True,
+                )
+            except (ImportError, ModuleNotFoundError) as exc:
+                if "onnxruntime" in str(exc):
+                    logger.warning("onnxruntime not installed. Loading silero-vad via torch.hub with onnx=False...")
+                    model, _ = torch.hub.load(
+                        "snakers4/silero-vad",
+                        "silero_vad",
+                        force_reload=False,
+                        onnx=False,
+                    )
+                else:
+                    raise
             return model
 
     @staticmethod

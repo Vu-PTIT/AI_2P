@@ -14,9 +14,31 @@ from openai import AsyncOpenAI
 
 from src import config
 
+import re
+
 logger = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 16_000
+
+_HALLUCINATION_PATTERNS = [
+    r"^[\W_]+$",  # Only punctuation/symbols/spaces (like "- -", "...", "---", "* *")
+    r"\[(BLANK_AUDIO|âm thanh|nhạc|tiếng thở|vỗ tay|silence|im lặng)\]",
+    r"\((silence|im lặng|nhạc|tiếng ồn)\)",
+    r"(subtitles by|amara\.org|cảm ơn các bạn đã theo dõi|hãy đăng ký kênh)",
+]
+
+
+def _clean_and_validate_text(text: str) -> str:
+    """Clean ASR output and filter out Whisper hallucinations or pure noise/symbols."""
+    text = text.strip()
+    if not text or not any(c.isalnum() for c in text):
+        return ""
+    text_lower = text.lower()
+    for pattern in _HALLUCINATION_PATTERNS:
+        if re.search(pattern, text_lower, re.IGNORECASE):
+            return ""
+    return text
+
 
 # Module-level client — one shared instance (connection pool)
 _client = AsyncOpenAI(
@@ -62,8 +84,9 @@ async def transcribe(pcm_float: np.ndarray, language: str) -> str:
             response_format="json",
             timeout=30,
         )
-        text = response.text.strip()
-        logger.debug("ASR [%s|%s]: %r", language, model_name, text[:80])
+        text = _clean_and_validate_text(response.text)
+        if text:
+            logger.debug("ASR [%s|%s]: %r", language, model_name, text[:80])
         return text
     except Exception as exc:  # noqa: BLE001
         logger.error("ASR error: %s", exc)

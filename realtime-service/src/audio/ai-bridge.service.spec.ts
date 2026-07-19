@@ -8,8 +8,8 @@ type MockWebSocket = EventEmitter & {
   url: URL;
   readyState: number;
   sent: string[];
-  send: jest.Mock<(data: string) => void>;
-  close: jest.Mock<() => void>;
+  send: jest.Mock<any, any>;
+  close: jest.Mock<any, any>;
 };
 
 type MockWebSocketState = {
@@ -73,7 +73,7 @@ jest.mock('ws', () => {
     constructor(url: URL) {
       super();
       this.url = url;
-      sockets.push(this);
+      sockets.push(this as unknown as MockWebSocket);
 
       queueMicrotask(() => {
         if (this.readyState !== TestWebSocket.CONNECTING) return;

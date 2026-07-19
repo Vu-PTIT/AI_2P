@@ -53,6 +53,8 @@ class SessionWorker:
         self._interim_translate_task: asyncio.Task | None = None
         self._final_task: asyncio.Task | None = None
         self._last_interim_text: str = ""
+        self._history: list[tuple[str, str, str]] = []  # (src_lang, source_text, translated_text)
+        self._glossary: list[dict[str, str]] = []  # [{ "original": "...", "preferred": "..." }]
 
     # ------------------------------------------------------------------
     # Entry point
@@ -98,6 +100,9 @@ class SessionWorker:
             await self._handle_init(msg)
         elif msg_type == "session.close":
             await self._ws.close()
+        elif msg_type == "session.glossary":
+            self._glossary = msg.get("glossary", [])
+            logger.info("Updated session glossary (%d terms)", len(self._glossary))
         elif msg_type == "speaker.switch":
             new_speaker = msg.get("speaker")
             if new_speaker in ("vi", "en"):
@@ -122,11 +127,13 @@ class SessionWorker:
         conf = msg.get("config", {})
         self._speaker = conf.get("speaker", "vi")
         self._language_pair = conf.get("languagePair", "vi-en")
+        self._glossary = conf.get("glossary", [])
 
         logger.info(
-            "session.init: speaker=%s languagePair=%s",
+            "session.init: speaker=%s languagePair=%s glossary_terms=%d",
             self._speaker,
             self._language_pair,
+            len(self._glossary),
         )
 
         probe_ok = await self._probe_external_apis()
@@ -148,7 +155,7 @@ class SessionWorker:
             "languagePair": self._language_pair,
             "capabilities": {
                 "asr": f"fpt:vi={cfg.FPT_ASR_MODEL_VI},en={cfg.FPT_ASR_MODEL_EN}",
-                "translate": f"fpt:{cfg.FPT_LLM_MODEL}",
+                "translate": f"fpt:stream={cfg.FPT_STREAM_LLM_MODEL},final={cfg.FPT_LLM_MODEL}",
             },
             "externalApisProbed": True,
         })
@@ -291,7 +298,9 @@ class SessionWorker:
     async def _stream_interim_translation(self, text: str, utt_id: str) -> None:
         src, tgt = self._speaker, self._other_language()
         try:
-            async for partial in fpt_translate.translate_stream(text, src, tgt):
+            async for partial in fpt_translate.translate_stream(
+                text, src, tgt, history=self._history, glossary=self._glossary, mode="interim"
+            ):
                 await self._send_json({
                     "type": "translate.partial",
                     "text": partial,
@@ -327,7 +336,9 @@ class SessionWorker:
             src, tgt = self._speaker, self._other_language()
 
             last_partial = ""
-            async for partial in fpt_translate.translate_stream(text, src, tgt):
+            async for partial in fpt_translate.translate_stream(
+                text, src, tgt, history=self._history, glossary=self._glossary, mode="final"
+            ):
                 last_partial = partial
                 await self._send_json({
                     "type": "translate.partial",
@@ -338,6 +349,7 @@ class SessionWorker:
                 })
 
             if last_partial:
+                self._history.append((src, text, last_partial))
                 await self._send_json({
                     "type": "translate.done",
                     "fullText": last_partial,

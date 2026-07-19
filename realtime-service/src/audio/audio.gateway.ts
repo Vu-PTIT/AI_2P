@@ -125,10 +125,29 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
         previousSocket.disconnect(true);
       }
 
+      let glossary: Array<{ original: string; preferred: string; notes?: string }> | undefined;
+      try {
+        if (typeof client.handshake.query?.glossary === 'string') {
+          const parsed = JSON.parse(client.handshake.query.glossary);
+          if (Array.isArray(parsed)) {
+            glossary = parsed
+              .map((item: any) => ({
+                original: String(item?.original || '').trim(),
+                preferred: String(item?.preferred || '').trim(),
+                notes: item?.notes ? String(item.notes).trim() : undefined,
+              }))
+              .filter((item) => item.original && item.preferred);
+          }
+        }
+      } catch {
+        // ignore invalid JSON
+      }
+
       await this.aiBridge.openSession(sessionId, clientId, {
         domain,
         languagePair,
         speaker: language ?? 'vi',
+        glossary,
       });
 
       if (
@@ -242,6 +261,37 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.aiBridge.sendControl(sessionId, clientId, {
       type: 'speaker.switch',
       speaker,
+    });
+  }
+
+  @SubscribeMessage('session.glossary')
+  onSessionGlossary(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { glossary?: Array<{ original: string; preferred: string; notes?: string }> },
+  ): void {
+    const { sessionId, clientId } = getSocketData(client);
+    if (!sessionId || !clientId) return;
+
+    if (
+      !this.sessionStore.isLive(sessionId) ||
+      !this.sessionStore.isCurrentClient(sessionId, clientId, client.id) ||
+      !body?.glossary ||
+      !Array.isArray(body.glossary)
+    ) {
+      return;
+    }
+
+    const cleanGlossary = body.glossary
+      .map((item: any) => ({
+        original: String(item?.original || '').trim(),
+        preferred: String(item?.preferred || '').trim(),
+        notes: item?.notes ? String(item.notes).trim() : undefined,
+      }))
+      .filter((item) => item.original && item.preferred);
+
+    this.aiBridge.sendControl(sessionId, clientId, {
+      type: 'session.glossary',
+      glossary: cleanGlossary,
     });
   }
 

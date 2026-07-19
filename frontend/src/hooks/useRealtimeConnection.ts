@@ -59,6 +59,7 @@ export function useRealtimeConnection({
     localLanguage,
     languageOrder,
     participants,
+    glossary,
   } = meeting
   const { clientId } = realtimeSession
   const gatewayReady =
@@ -69,11 +70,18 @@ export function useRealtimeConnection({
     )?.name ?? clientId
 
   useEffect(() => {
+    const socket = socketRef.current
+    if (socket?.connected && gatewayReady) {
+      socket.emit('session.glossary', { glossary })
+    }
+  }, [glossary, gatewayReady])
+
+  useEffect(() => {
     if (meetingStatus !== 'live') {
       return
     }
 
-    const query = {
+    const query: RealtimeConnectionQuery = {
       sessionId: roomId,
       clientId,
       domain: 'business',
@@ -81,7 +89,8 @@ export function useRealtimeConnection({
       title,
       displayName,
       localLanguage,
-    } satisfies RealtimeConnectionQuery
+      glossary: JSON.stringify(glossary),
+    }
 
     const socket = io(`${SOCKET_URL}/audio`, {
       query,

@@ -24,6 +24,9 @@ FPT_ASR_MODEL_VI: str = _optional(
 )
 FPT_ASR_MODEL_EN: str = _optional("FPT_ASR_MODEL_EN", "whisper-large-v3-turbo")
 FPT_ASR_MODEL: str = FPT_ASR_MODEL_VI  # Backward-compatible alias
+FPT_STREAM_LLM_MODEL: str = _optional(
+    "FPT_STREAM_LLM_MODEL", _optional("FPT_LLM_MODEL", "SaoLa3.1-medium")
+)
 FPT_LLM_MODEL: str = _optional("FPT_LLM_MODEL", "SaoLa3.1-medium")
 
 

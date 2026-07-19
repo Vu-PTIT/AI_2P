@@ -4,10 +4,11 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import WebSocket from 'ws';
 import type { AiWorkerEvent, Language } from '../common/types/events.type';
 
-type AiSessionConfig = {
+export type AiSessionConfig = {
   domain: string;
   languagePair: string;
   speaker: Language;
+  glossary?: Array<{ original: string; preferred: string; notes?: string }>;
 };
 
 type AiPipeline = {
