@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import {
   ArrowRight,
   CalendarClock,
@@ -16,12 +17,14 @@ import { useNavigate } from 'react-router'
 import { BrandMark } from '@/components/layout/BrandMark'
 import { LocaleSwitcher } from '@/components/layout/LocaleSwitcher'
 import { ConversationTurnCard } from '@/components/meeting/ConversationTurnCard'
+import { FormattedAiSummary } from '@/components/meeting/FormattedAiSummary'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { useClipboard } from '@/hooks/useClipboard'
 import { useRoomSession } from '@/hooks/useRoomSession'
 import { useTranslation } from '@/hooks/useTranslation'
+import { API_URL } from '@/lib/config'
 import { ROUTES } from '@/lib/constants'
 import { createRoomId } from '@/lib/meetingIdentity'
 import {
@@ -44,6 +47,10 @@ export default function MeetingSummaryPage() {
   const prepareAnotherMeeting = useMeetingStore(
     (state) => state.prepareAnotherMeeting,
   )
+  const setAiSummary = useMeetingStore((state) => state.setAiSummary)
+  const setAiSummaryStatus = useMeetingStore(
+    (state) => state.setAiSummaryStatus,
+  )
   const { copy, copyState } = useClipboard()
   const displayedTurns = meeting.turns
   const displayedDuration = meeting.durationSeconds
@@ -61,6 +68,67 @@ export default function MeetingSummaryPage() {
   const dateTimeLabel = meeting.startedAt
     ? formatDateTime(meeting.startedAt, locale)
     : t('summary.notRecorded')
+
+  const aiSummary = meeting.aiSummary
+  const aiSummaryStatus = meeting.aiSummaryStatus || 'idle'
+
+  const startAiSummaryGeneration = async () => {
+    if (!hasSummaryContent) return
+    setAiSummary('', 'loading')
+    try {
+      const response = await fetch(`${API_URL}/summary/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: meeting.title,
+          turns: meeting.turns,
+          notes: meeting.notes,
+        }),
+      })
+      if (!response.body) {
+        throw new Error('No stream body received')
+      }
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(trimmed.slice(6))
+              if (data.type === 'summary.partial') {
+                setAiSummary(data.summary, 'streaming')
+              } else if (data.type === 'summary.done') {
+                setAiSummary(data.summary, 'done')
+              } else if (data.type === 'error') {
+                setAiSummaryStatus('error')
+              }
+            } catch (e) {
+              // ignore malformed lines
+            }
+          }
+        }
+      }
+    } catch (error) {
+      setAiSummaryStatus('error')
+    }
+  }
+
+  useEffect(() => {
+    if (
+      hasSummaryContent &&
+      (!meeting.aiSummaryStatus || meeting.aiSummaryStatus === 'idle') &&
+      !meeting.aiSummary
+    ) {
+      startAiSummaryGeneration()
+    }
+  }, [hasSummaryContent, meeting.aiSummaryStatus, meeting.aiSummary])
 
   let summaryText = ''
   let actionItems: ActionItem[]
@@ -340,19 +408,58 @@ export default function MeetingSummaryPage() {
             aria-labelledby="summary-heading"
             className="rounded-[14px] border border-line-strong bg-panel px-5 py-6 shadow-[0_8px_24px_rgb(16_24_40/0.04)] sm:px-7 sm:py-8"
           >
-            <div className="flex items-center gap-2 text-primary">
-              <Clipboard className="size-4" aria-hidden="true" />
-              <h2
-                id="summary-heading"
-                className="text-xs font-bold uppercase tracking-[0.12em]"
-              >
-                {t('summary.title')}
-              </h2>
+            <div className="flex items-center justify-between gap-2 border-b border-line pb-4">
+              <div className="flex items-center gap-2 text-primary">
+                <Clipboard className="size-4" aria-hidden="true" />
+                <h2
+                  id="summary-heading"
+                  className="text-xs font-bold uppercase tracking-[0.12em]"
+                >
+                  {t('summary.title')} (FPT AI Model)
+                </h2>
+              </div>
+              {hasSummaryContent && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={startAiSummaryGeneration}
+                  disabled={
+                    aiSummaryStatus === 'loading' ||
+                    aiSummaryStatus === 'streaming'
+                  }
+                  className="h-8 gap-1.5 text-xs"
+                >
+                  <RotateCcw className="size-3.5" />
+                  {aiSummaryStatus === 'loading' ||
+                  aiSummaryStatus === 'streaming'
+                    ? 'Đang tạo tóm tắt...'
+                    : 'Tạo lại bằng AI'}
+                </Button>
+              )}
             </div>
-            <p className="mt-5 max-w-[70ch] break-words text-base leading-8 text-ink-soft sm:text-lg">
-              {summaryText}
-            </p>
-            {hasSummaryContent && (
+            <div className="mt-5">
+              {aiSummaryStatus === 'loading' && !aiSummary ? (
+                <div className="flex flex-col gap-3 py-6">
+                  <div className="flex items-center gap-2 text-sm font-medium text-primary animate-pulse">
+                    <span className="size-2 rounded-full bg-primary animate-ping" />
+                    Đang gọi FPT AI Model để tóm tắt cuộc họp...
+                  </div>
+                  <div className="h-4 w-3/4 rounded bg-panel-hover animate-pulse" />
+                  <div className="h-4 w-1/2 rounded bg-panel-hover animate-pulse" />
+                  <div className="h-4 w-5/6 rounded bg-panel-hover animate-pulse" />
+                </div>
+              ) : aiSummary ? (
+                <FormattedAiSummary
+                  content={aiSummary}
+                  isStreaming={aiSummaryStatus === 'streaming'}
+                />
+              ) : (
+                <p className="max-w-[70ch] break-words text-base leading-8 text-ink-soft sm:text-lg">
+                  {summaryText}
+                </p>
+              )}
+            </div>
+            {hasSummaryContent && !aiSummary && (
               <p className="mt-4 max-w-[70ch] text-xs leading-5 text-muted">
                 {t('summary.localNotice')}
               </p>

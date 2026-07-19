@@ -312,10 +312,38 @@ export class AudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.in(sessionId).disconnectSockets(true);
   }
 
+  @SubscribeMessage('session.summarize')
+  onSessionSummarize(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body?: { title?: string; turns?: unknown[]; notes?: unknown[] },
+  ): void {
+    const { sessionId, clientId } = getSocketData(client);
+    if (!sessionId || !clientId) return;
+
+    const snapshot = this.sessionStore.getPublicSnapshot(sessionId);
+    const title = body?.title || (snapshot.exists ? snapshot.title : 'Cuộc họp');
+    const turns = Array.isArray(body?.turns) ? body.turns : [];
+    const notes = Array.isArray(body?.notes) ? body.notes : [];
+
+    this.aiBridge.sendControl(sessionId, clientId, {
+      type: 'session.summarize',
+      title,
+      turns,
+      notes,
+    });
+  }
+
   @OnEvent('ai.event')
   handleAiEvent(payload: AiEventPayload): void {
     const { sessionId, clientId, ...event } = payload;
-    if (!this.sessionStore.isLive(sessionId)) return;
+    if (
+      !this.sessionStore.isLive(sessionId) &&
+      event.type !== 'summary.partial' &&
+      event.type !== 'summary.done' &&
+      event.type !== 'error'
+    ) {
+      return;
+    }
     const clientMetadata = this.sessionStore.getClientMetadata(
       sessionId,
       clientId,

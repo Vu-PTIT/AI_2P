@@ -89,6 +89,8 @@ export interface Meeting {
   startedAt: string | null
   endedAt: string | null
   durationSeconds: number
+  aiSummary?: string
+  aiSummaryStatus?: 'idle' | 'loading' | 'streaming' | 'done' | 'error'
 }
 
 export interface ActionItem {

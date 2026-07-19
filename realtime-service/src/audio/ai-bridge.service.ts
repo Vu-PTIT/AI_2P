@@ -29,6 +29,8 @@ const SUPPORTED_AI_EVENTS = new Set<AiWorkerEvent['type']>([
   'translate.partial',
   'translate.token',
   'translate.done',
+  'summary.partial',
+  'summary.done',
   'error',
 ]);
 

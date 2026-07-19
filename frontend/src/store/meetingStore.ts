@@ -76,6 +76,8 @@ export interface MeetingStoreActions {
     event: RealtimeServerEvent,
     receivedAt?: number,
   ) => void
+  setAiSummary: (summary: string, status?: Meeting['aiSummaryStatus']) => void
+  setAiSummaryStatus: (status: Meeting['aiSummaryStatus']) => void
 }
 
 export type MeetingStore = MeetingStoreState & MeetingStoreActions
@@ -517,6 +519,8 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
         startedAt: null,
         endedAt: null,
         durationSeconds: 0,
+        aiSummary: undefined,
+        aiSummaryStatus: 'idle',
       },
       microphoneEnabled: true,
       cameraEnabled: false,
@@ -539,6 +543,25 @@ const createMeetingStore: StateCreator<MeetingStore> = (set) => ({
 
   setActiveTurnId: (activeTurnId) => {
     set({ activeTurnId })
+  },
+
+  setAiSummary: (aiSummary, aiSummaryStatus = 'streaming') => {
+    set((state) => ({
+      meeting: {
+        ...state.meeting,
+        aiSummary,
+        aiSummaryStatus,
+      },
+    }))
+  },
+
+  setAiSummaryStatus: (aiSummaryStatus) => {
+    set((state) => ({
+      meeting: {
+        ...state.meeting,
+        aiSummaryStatus,
+      },
+    }))
   },
 
   setRealtimeStatus: (status) => {

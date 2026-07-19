@@ -7,6 +7,7 @@ Emits structured meeting summary matching the 7-part specification.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from typing import Any
@@ -68,7 +69,7 @@ def _format_conversation_input(
     for idx, turn in enumerate(turns, 1):
         if isinstance(turn, dict):
             speaker = turn.get("speakerName") or turn.get("displayName") or turn.get("speaker") or "Người nói"
-            text = turn.get("sourceText") or turn.get("text") or ""
+            text = turn.get("originalText") or turn.get("sourceText") or turn.get("text") or ""
             translated = turn.get("translatedText") or ""
             content = text
             if translated and translated != text:
@@ -152,6 +153,7 @@ async def summarize_meeting_stream(
             if delta:
                 accumulated += delta
                 yield accumulated
+                await asyncio.sleep(0.015)
 
         logger.info("Streamed meeting summary for %r (%d turns)", title, len(turns))
     except Exception as exc:  # noqa: BLE001

@@ -163,6 +163,26 @@ export function useRealtimeConnection({
         applyRealtimeEvent(event)
       }
     })
+    socket.on('summary.partial', (value: unknown) => {
+      if (
+        value &&
+        typeof value === 'object' &&
+        'summary' in value &&
+        typeof value.summary === 'string'
+      ) {
+        useMeetingStore.getState().setAiSummary(value.summary, 'streaming')
+      }
+    })
+    socket.on('summary.done', (value: unknown) => {
+      if (
+        value &&
+        typeof value === 'object' &&
+        'summary' in value &&
+        typeof value.summary === 'string'
+      ) {
+        useMeetingStore.getState().setAiSummary(value.summary, 'done')
+      }
+    })
 
     socket.on('session.ended', () => {
       applyRealtimeEvent({ type: 'session.ended' })
